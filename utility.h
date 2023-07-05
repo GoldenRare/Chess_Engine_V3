@@ -81,4 +81,8 @@ inline Square bitboardToSquare(Bitboard b) {
     return __builtin_ctzll(b);
 }
 
+inline int max(int a, int b) {
+    return a >= b ? a : b;
+}
+
 #endif
