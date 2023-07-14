@@ -32,7 +32,8 @@ enum Piece {
 typedef enum Piece Piece;
 
 enum Direction {
-    NORTH = 8, SOUTH = -8, EAST = -1, WEST = 1
+    NORTH = 8, SOUTH = -8, EAST = -1, WEST = 1,
+    NORTH_EAST = 7, NORTH_WEST = 9, SOUTH_EAST = -9, SOUTH_WEST = -7
 };
 typedef enum Direction Direction;
 
