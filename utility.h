@@ -72,8 +72,7 @@ inline Bitboard squareToBitboard(Square sq) {
 }
 
 inline Bitboard shiftBitboard(Bitboard b, Direction d) {
-    if (d > 0) return b << d;
-    else return b >> -d;
+    return d > 0 ? b << d : b >> -d;
 }
 
 /* Undefined for b == 0 */
