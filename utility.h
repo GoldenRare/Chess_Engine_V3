@@ -68,6 +68,14 @@ inline File squareToFile(Square sq) {
     return sq & 7;
 }
 
+inline Bitboard rankOfSquare(Square sq) {
+    return RANK_1_BB << squareToRank(sq) * NORTH;
+}
+
+inline Bitboard fileOfSquare(Square sq) {
+    return FILE_A_BB >> squareToFile(sq) * -EAST;
+}
+
 inline Bitboard squareToBitboard(Square sq) {
     return 0x8000000000000000ULL >> sq;
 }
