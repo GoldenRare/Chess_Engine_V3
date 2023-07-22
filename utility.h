@@ -68,11 +68,11 @@ inline File squareToFile(Square sq) {
     return sq & 7;
 }
 
-inline Bitboard rankOfSquare(Square sq) {
+inline Bitboard rankBitboardOfSquare(Square sq) {
     return RANK_1_BB << squareToRank(sq) * NORTH;
 }
 
-inline Bitboard fileOfSquare(Square sq) {
+inline Bitboard fileBitboardOfSquare(Square sq) {
     return FILE_A_BB >> squareToFile(sq) * -EAST;
 }
 
@@ -91,6 +91,10 @@ inline Bitboard shiftBitboard(Bitboard b, Direction d) {
 /* Undefined for b == 0 */
 inline Square bitboardToSquare(Bitboard b) {
     return __builtin_ctzll(b);
+}
+
+inline int populationCount(Bitboard b) {
+    return __builtin_popcountll(b);
 }
 
 inline int max(int a, int b) {
