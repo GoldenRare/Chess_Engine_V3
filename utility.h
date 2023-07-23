@@ -21,6 +21,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <immintrin.h>
 
 typedef uint64_t Bitboard;
 
@@ -95,6 +96,11 @@ inline Square bitboardToSquare(Bitboard b) {
 
 inline int populationCount(Bitboard b) {
     return __builtin_popcountll(b);
+}
+
+/* Parallel Bits Extract */
+inline uint64_t pext(uint64_t src, uint64_t mask) {
+    return _pext_u64(src, mask);
 }
 
 inline int max(int a, int b) {
