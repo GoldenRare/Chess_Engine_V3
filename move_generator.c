@@ -3,9 +3,11 @@
 #include "utility.h"
 
 Bitboard knightAttacks[SQUARES];
+Bitboard slidingAttacks[MAX_SLIDING_ATTACKS];
 
 void initializeMoveGenerator() {
     initializeKnightAttacks();
+    initializeSlidingAttacks();
 }
 
 void initializeKnightAttacks() {
@@ -19,6 +21,28 @@ void initializeKnightAttacks() {
                           | shiftBitboard(shiftBitboard(b & ~FILE_A_BB & ~FILE_B_BB, WEST),  SOUTH_WEST)
                           | shiftBitboard(shiftBitboard(b & ~FILE_A_BB & ~FILE_B_BB, WEST),  NORTH_WEST)
                           | shiftBitboard(shiftBitboard(b &              ~FILE_A_BB, NORTH), NORTH_WEST);
+    }
+}
+
+void initializeSlidingAttacks() {
+    enum {numSlidingGroups = 2};
+    const Direction slidingDirections[numSlidingGroups][NUMBER_OF_SLIDING_DIRECTIONS] = {{NORTH, SOUTH, EAST, WEST}, {NORTH_EAST, NORTH_WEST, SOUTH_EAST, SOUTH_WEST}};
+    Bitboard count = 0;
+
+    for (size_t i = 0; i < numSlidingGroups; i++) {
+        for (Square sq = 0; sq < SQUARES; sq++) {
+            Bitboard edges = ((RANK_1_BB | RANK_8_BB) & ~rankBitboardOfSquare(sq)) | ((FILE_A_BB | FILE_H_BB) & ~fileBitboardOfSquare(sq));
+            Bitboard relevantOccupancyMask = generateSlidingAttacks(slidingDirections[i], NUMBER_OF_SLIDING_DIRECTIONS, sq, 0) & ~edges;
+                                  
+            Bitboard occupiedSubset = 0;
+            Bitboard startIndex = count;
+            do {
+                Bitboard attacks = generateSlidingAttacks(slidingDirections[i], NUMBER_OF_SLIDING_DIRECTIONS, sq, occupiedSubset);
+                slidingAttacks[startIndex + pext(occupiedSubset, relevantOccupancyMask)] = attacks;
+                occupiedSubset = (occupiedSubset - relevantOccupancyMask) & relevantOccupancyMask;
+                count++;
+            } while (occupiedSubset);
+        }
     }
 }
 
