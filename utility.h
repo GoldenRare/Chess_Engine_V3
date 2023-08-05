@@ -25,6 +25,12 @@
 
 typedef uint64_t Bitboard;
 
+/* Atypical ordering for the moment due to indexing purposes. */
+enum PieceType {
+    KNIGHT, KING, PIECE_TYPES
+};
+typedef enum PieceType PieceType;
+
 enum Piece {
     WHITE_PAWN, WHITE_KNIGHT, WHITE_BISHOP, WHITE_ROOK, WHITE_QUEEN, WHITE_KING,
     BLACK_PAWN, BLACK_KNIGHT, BLACK_BISHOP, BLACK_ROOK, BLACK_QUEEN, BLACK_KING,
