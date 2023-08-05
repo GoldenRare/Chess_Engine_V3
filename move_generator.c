@@ -2,25 +2,19 @@
 #include "move_generator.h"
 #include "utility.h"
 
-Bitboard knightAttacks[SQUARES];
+Bitboard pieceAttacks[PIECE_TYPES][SQUARES];
 Bitboard slidingAttacks[MAX_SLIDING_ATTACKS];
 
 void initializeMoveGenerator() {
-    initializeKnightAttacks();
+    initializePieceAttacks();
     initializeSlidingAttacks();
 }
 
-void initializeKnightAttacks() {
+void initializePieceAttacks() {
     for (Square sq = 0; sq < SQUARES; sq++) {
-        Bitboard b = squareToBitboard(sq);
-        knightAttacks[sq] = shiftBitboard(shiftBitboard(b &              ~FILE_H_BB, NORTH), NORTH_EAST) 
-                          | shiftBitboard(shiftBitboard(b & ~FILE_G_BB & ~FILE_H_BB, EAST),  NORTH_EAST)
-                          | shiftBitboard(shiftBitboard(b & ~FILE_G_BB & ~FILE_H_BB, EAST),  SOUTH_EAST)
-                          | shiftBitboard(shiftBitboard(b &              ~FILE_H_BB, SOUTH), SOUTH_EAST)
-                          | shiftBitboard(shiftBitboard(b &              ~FILE_A_BB, SOUTH), SOUTH_WEST)
-                          | shiftBitboard(shiftBitboard(b & ~FILE_A_BB & ~FILE_B_BB, WEST),  SOUTH_WEST)
-                          | shiftBitboard(shiftBitboard(b & ~FILE_A_BB & ~FILE_B_BB, WEST),  NORTH_WEST)
-                          | shiftBitboard(shiftBitboard(b &              ~FILE_A_BB, NORTH), NORTH_WEST);
+        Bitboard sqBB = squareToBitboard(sq);
+        pieceAttacks[KNIGHT][sq] = generateKnightAttacks(sqBB);
+        pieceAttacks[KING][sq] = generateKingAttacks(sqBB);
     }
 }
 
@@ -46,6 +40,17 @@ void initializeSlidingAttacks() {
     }
 }
 
+Bitboard generateKnightAttacks(Bitboard knightSq) {
+    return shiftBitboard(shiftBitboard(knightSq &              ~FILE_H_BB, NORTH), NORTH_EAST) 
+         | shiftBitboard(shiftBitboard(knightSq & ~FILE_G_BB & ~FILE_H_BB, EAST),  NORTH_EAST)
+         | shiftBitboard(shiftBitboard(knightSq & ~FILE_G_BB & ~FILE_H_BB, EAST),  SOUTH_EAST)
+         | shiftBitboard(shiftBitboard(knightSq &              ~FILE_H_BB, SOUTH), SOUTH_EAST)
+         | shiftBitboard(shiftBitboard(knightSq &              ~FILE_A_BB, SOUTH), SOUTH_WEST)
+         | shiftBitboard(shiftBitboard(knightSq & ~FILE_A_BB & ~FILE_B_BB, WEST),  SOUTH_WEST)
+         | shiftBitboard(shiftBitboard(knightSq & ~FILE_A_BB & ~FILE_B_BB, WEST),  NORTH_WEST)
+         | shiftBitboard(shiftBitboard(knightSq &              ~FILE_A_BB, NORTH), NORTH_WEST);
+}
+
 Bitboard generateSlidingAttacks(const Direction directions[], size_t numDirections, Square sq, Bitboard occupied) {
     Bitboard attacks = 0ULL;
     for (size_t i = 0; i < numDirections; i++) {
@@ -61,6 +66,12 @@ Bitboard generateSlidingAttacks(const Direction directions[], size_t numDirectio
         }
     }
     return attacks;
+}
+
+Bitboard generateKingAttacks(Bitboard kingSq) {
+    Bitboard attacks = shiftBitboard(kingSq & ~FILE_H_BB, EAST) | shiftBitboard(kingSq & ~FILE_A_BB, WEST);
+    kingSq |= attacks;
+    return attacks | shiftBitboard(kingSq, NORTH) | shiftBitboard(kingSq, SOUTH);
 }
 
 bool isDirectionMaintained(Square fromSq, Square toSq) {
