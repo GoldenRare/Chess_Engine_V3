@@ -31,6 +31,11 @@ enum PieceType {
 };
 typedef enum PieceType PieceType;
 
+enum Colour {
+    WHITE, BLACK, COLOURS
+};
+typedef enum Colour Colour;
+
 enum Piece {
     WHITE_PAWN, WHITE_KNIGHT, WHITE_BISHOP, WHITE_ROOK, WHITE_QUEEN, WHITE_KING,
     BLACK_PAWN, BLACK_KNIGHT, BLACK_BISHOP, BLACK_ROOK, BLACK_QUEEN, BLACK_KING,
@@ -95,9 +100,16 @@ inline Bitboard shiftBitboard(Bitboard b, Direction d) {
     return d > 0 ? b << d : b >> -d;
 }
 
-/* Undefined for b == 0 */
+/* If multiple bits are set, returns square of Least Significant Bit. Undefined for b == 0. */
 inline Square bitboardToSquare(Bitboard b) {
-    return __builtin_ctzll(b);
+    return H1 - __builtin_ctzll(b); // Should also test bit scan reverse to see if faster than doing (H1 - x);
+}
+
+/* If multiple bits are set, returns square of Least Significant Bit and removes the LSB from pointer. Undefined for b == 0. */
+inline Square bitboardToSquareWithReset(Bitboard *b) {
+    Square sq = H1 - __builtin_ctzll(*b);
+    *b = _blsr_u64(*b);
+    return sq;
 }
 
 inline int populationCount(Bitboard b) {
