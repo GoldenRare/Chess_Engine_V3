@@ -9,6 +9,16 @@
 #include "chess_board.h"
 #include "utility.h"
 
+typedef uint16_t Move;
+
+inline void setFromSquare(Move *move, Square sq) {
+    *move |= sq;
+}
+
+inline void setToSquare(Move *move, Square sq) {
+    *move |= sq << 6;
+}
+
 extern Bitboard pieceAttacks[PIECE_TYPES][SQUARES];
 extern Bitboard slidingAttacks[MAX_SLIDING_ATTACKS];
 
@@ -18,7 +28,7 @@ void initializeSlidingAttacks();
 Bitboard generateKnightAttacks(Bitboard knightSq);
 Bitboard generateSlidingAttacks(const Direction directions[], size_t numDirections, Square sq, Bitboard occupied);
 Bitboard generateKingAttacks(Bitboard kingSq);
-/* Essentially checks if fromSq and toSq are within a king ring distance from each other.*/
+/* Essentially checks if fromSq and toSq are within a king ring distance from each other. */
 bool isDirectionMaintained(Square fromSq, Square toSq); 
 
 #endif
