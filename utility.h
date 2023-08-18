@@ -24,6 +24,7 @@
 #include <immintrin.h>
 
 typedef uint64_t Bitboard;
+typedef uint16_t Move;
 
 /* Atypical ordering for the moment due to indexing purposes. */
 enum PieceType {
@@ -110,6 +111,22 @@ inline Square bitboardToSquareWithReset(Bitboard *b) {
     Square sq = H1 - __builtin_ctzll(*b);
     *b = _blsr_u64(*b);
     return sq;
+}
+
+inline void setFromSquare(Move *move, Square sq) {
+    *move |= sq;
+}
+
+inline void setToSquare(Move *move, Square sq) {
+    *move |= sq << 6;
+}
+
+inline Square getFromSquare(Move *move) {
+    return *move & 0x3F;
+}
+
+inline Square getToSquare(Move *move) {
+    return *move >> 6 & 0x3F;
 }
 
 inline int populationCount(Bitboard b) {
