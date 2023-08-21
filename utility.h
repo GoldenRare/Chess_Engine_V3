@@ -26,9 +26,9 @@
 typedef uint64_t Bitboard;
 typedef uint16_t Move;
 
-/* Atypical ordering for the moment due to indexing purposes. */
+/* Atypical ordering due to indexing purposes. */
 enum PieceType {
-    KNIGHT, KING, PIECE_TYPES
+    KNIGHT, KING, PAWN, BISHOP, ROOK, QUEEN, PIECE_TYPES, PIECE_ATTACKS_SIZE = 2
 };
 typedef enum PieceType PieceType;
 
@@ -121,11 +121,11 @@ inline void setToSquare(Move *move, Square sq) {
     *move |= sq << 6;
 }
 
-inline Square getFromSquare(Move *move) {
+inline Square getFromSquare(const Move *move) {
     return *move & 0x3F;
 }
 
-inline Square getToSquare(Move *move) {
+inline Square getToSquare(const Move *move) {
     return *move >> 6 & 0x3F;
 }
 
