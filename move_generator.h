@@ -8,16 +8,20 @@
 #include "chess_board.h"
 #include "utility.h"
 
-extern Bitboard pieceAttacks[PIECE_TYPES][SQUARES];
+extern Bitboard pawnAttacks[COLOURS][SQUARES];
+extern Bitboard pieceAttacks[PIECE_ATTACKS_SIZE][SQUARES];
 extern Bitboard slidingAttacks[MAX_SLIDING_ATTACKS];
 
 void initializeMoveGenerator();
-void initializePieceAttacks();
+void initializeNonSlidingAttacks();
 void initializeSlidingAttacks();
+
 Bitboard generateKnightAttacks(Bitboard knightSq);
 Bitboard generateSlidingAttacks(const Direction directions[], size_t numDirections, Square sq, Bitboard occupied);
 Bitboard generateKingAttacks(Bitboard kingSq);
+
 void generateKnightMoves(const ChessBoard *board, Move *moveList);
+
 /* Essentially checks if fromSq and toSq are within a king ring distance from each other. */
 bool isDirectionMaintained(Square fromSq, Square toSq); 
 

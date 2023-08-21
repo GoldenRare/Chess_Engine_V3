@@ -1,18 +1,22 @@
 #include <stdlib.h>
+#include "chess_board.h"
 #include "move_generator.h"
 #include "utility.h"
 
-Bitboard pieceAttacks[PIECE_TYPES][SQUARES];
+Bitboard pawnAttacks[COLOURS][SQUARES];
+Bitboard pieceAttacks[PIECE_ATTACKS_SIZE][SQUARES];
 Bitboard slidingAttacks[MAX_SLIDING_ATTACKS];
 
 void initializeMoveGenerator() {
-    initializePieceAttacks();
+    initializeNonSlidingAttacks();
     initializeSlidingAttacks();
 }
 
-void initializePieceAttacks() {
+void initializeNonSlidingAttacks() {
     for (Square sq = 0; sq < SQUARES; sq++) {
         Bitboard sqBB = squareToBitboard(sq);
+        pawnAttacks[WHITE][sq] = shiftBitboard(sqBB & ~FILE_H_BB, NORTH_EAST) | shiftBitboard(sqBB & ~FILE_A_BB, NORTH_WEST);
+        pawnAttacks[BLACK][sq] = shiftBitboard(sqBB & ~FILE_H_BB, SOUTH_EAST) | shiftBitboard(sqBB & ~FILE_A_BB, SOUTH_WEST);
         pieceAttacks[KNIGHT][sq] = generateKnightAttacks(sqBB);
         pieceAttacks[KING][sq] = generateKingAttacks(sqBB);
     }
