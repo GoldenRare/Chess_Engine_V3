@@ -3,6 +3,7 @@
 #include "move_generator.h"
 #include "utility.h"
 
+Magic magicTable[MAGIC_INDICES][SQUARES];
 Bitboard pawnAttacks[COLOURS][SQUARES];
 Bitboard pieceAttacks[PIECE_ATTACKS_SIZE][SQUARES];
 Bitboard slidingAttacks[MAX_SLIDING_ATTACKS];
@@ -23,17 +24,18 @@ void initializeNonSlidingAttacks() {
 }
 
 void initializeSlidingAttacks() {
-    enum {numSlidingGroups = 2};
-    const Direction slidingDirections[numSlidingGroups][NUMBER_OF_SLIDING_DIRECTIONS] = {{NORTH, SOUTH, EAST, WEST}, {NORTH_EAST, NORTH_WEST, SOUTH_EAST, SOUTH_WEST}};
-    Bitboard count = 0;
+    const Direction slidingDirections[MAGIC_INDICES][NUMBER_OF_SLIDING_DIRECTIONS] = {{NORTH_EAST, NORTH_WEST, SOUTH_EAST, SOUTH_WEST}, {NORTH, SOUTH, EAST, WEST}};
+    size_t count = 0;
 
-    for (size_t i = 0; i < numSlidingGroups; i++) {
+    for (size_t i = 0; i < MAGIC_INDICES; i++) {
         for (Square sq = 0; sq < SQUARES; sq++) {
             Bitboard edges = ((RANK_1_BB | RANK_8_BB) & ~rankBitboardOfSquare(sq)) | ((FILE_A_BB | FILE_H_BB) & ~fileBitboardOfSquare(sq));
             Bitboard relevantOccupancyMask = generateSlidingAttacks(slidingDirections[i], NUMBER_OF_SLIDING_DIRECTIONS, sq, 0) & ~edges;
                                   
             Bitboard occupiedSubset = 0;
-            Bitboard startIndex = count;
+            size_t startIndex = count;
+            magicTable[i][sq].mask = relevantOccupancyMask;
+            magicTable[i][sq].offset = startIndex;
             do {
                 Bitboard attacks = generateSlidingAttacks(slidingDirections[i], NUMBER_OF_SLIDING_DIRECTIONS, sq, occupiedSubset);
                 slidingAttacks[startIndex + pext(occupiedSubset, relevantOccupancyMask)] = attacks;

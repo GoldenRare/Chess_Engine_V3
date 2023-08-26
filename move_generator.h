@@ -5,9 +5,21 @@
 #define MAX_SLIDING_ATTACKS 107648
 
 #include <stdbool.h>
+#include <stdint.h>
 #include "chess_board.h"
 #include "utility.h"
 
+typedef struct Magic {
+    Bitboard mask;
+    uint32_t offset;
+} Magic;
+
+enum MagicIndex {
+    BISHOP_INDEX, ROOK_INDEX, MAGIC_INDICES
+};
+typedef enum MagicIndex MagicIndex;
+
+extern Magic magicTable[MAGIC_INDICES][SQUARES];
 extern Bitboard pawnAttacks[COLOURS][SQUARES];
 extern Bitboard pieceAttacks[PIECE_ATTACKS_SIZE][SQUARES];
 extern Bitboard slidingAttacks[MAX_SLIDING_ATTACKS];
