@@ -24,6 +24,11 @@ extern Bitboard pawnAttacks[COLOURS][SQUARES];
 extern Bitboard pieceAttacks[PIECE_ATTACKS_SIZE][SQUARES];
 extern Bitboard slidingAttacks[MAX_SLIDING_ATTACKS];
 
+inline Bitboard getSlidingAttacks(Bitboard occupied, Square sq, MagicIndex index) {
+    const Magic *magic = &magicTable[index][sq];
+    return slidingAttacks[magic->offset + pext(occupied, magic->mask)];
+}
+
 void initializeMoveGenerator();
 void initializeNonSlidingAttacks();
 void initializeSlidingAttacks();
