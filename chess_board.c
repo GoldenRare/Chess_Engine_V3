@@ -38,10 +38,8 @@ void parseFEN(ChessBoard *board, const char *fenString) {
 void addPiece(ChessBoard *board, Colour c, PieceType pt, Square sq) {
     Bitboard sqBB = squareToBitboard(sq);
     board->pieceTypes[sq] = pt;
-    board->piecesOnSide[c] |= sqBB;
+    board->pieces[c][ALL_PIECES] |= sqBB;
     board->pieces[c][pt] |= sqBB;
-    board->occupied |= sqBB;
-    board->empty = ~board->occupied;
 }
 
 void printBitboard(Bitboard b) {

@@ -26,9 +26,8 @@
 typedef uint64_t Bitboard;
 typedef uint16_t Move;
 
-/* Atypical ordering due to indexing purposes. */
 enum PieceType {
-    KNIGHT, KING, PAWN, BISHOP, ROOK, QUEEN, PIECE_TYPES, PIECE_ATTACKS_SIZE = 2
+    PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING, ALL_PIECES, PIECE_TYPES, NO_PIECE
 };
 typedef enum PieceType PieceType;
 

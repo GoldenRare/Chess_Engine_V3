@@ -5,7 +5,7 @@
 
 Magic magicTable[MAGIC_INDICES][SQUARES];
 Bitboard pawnAttacks[COLOURS][SQUARES];
-Bitboard pieceAttacks[PIECE_ATTACKS_SIZE][SQUARES];
+Bitboard nonSlidingAttacks[NON_SLIDER_ATTACKERS][SQUARES];
 Bitboard slidingAttacks[MAX_SLIDING_ATTACKS];
 
 void initializeMoveGenerator() {
@@ -18,8 +18,8 @@ void initializeNonSlidingAttacks() {
         Bitboard sqBB = squareToBitboard(sq);
         pawnAttacks[WHITE][sq] = shiftBitboard(sqBB & ~FILE_H_BB, NORTH_EAST) | shiftBitboard(sqBB & ~FILE_A_BB, NORTH_WEST);
         pawnAttacks[BLACK][sq] = shiftBitboard(sqBB & ~FILE_H_BB, SOUTH_EAST) | shiftBitboard(sqBB & ~FILE_A_BB, SOUTH_WEST);
-        pieceAttacks[KNIGHT][sq] = generateKnightAttacks(sqBB);
-        pieceAttacks[KING][sq] = generateKingAttacks(sqBB);
+        nonSlidingAttacks[KNIGHT_ATTACKER][sq] = generateKnightAttacks(sqBB);
+        nonSlidingAttacks[KING_ATTACKER][sq] = generateKingAttacks(sqBB);
     }
 }
 

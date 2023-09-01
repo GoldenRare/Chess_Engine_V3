@@ -7,10 +7,7 @@
 typedef struct ChessBoard {
     Colour sideToMove;
     PieceType pieceTypes[SQUARES];
-    Bitboard piecesOnSide[COLOURS];
     Bitboard pieces[COLOURS][PIECE_TYPES];
-    Bitboard occupied;
-    Bitboard empty;
 } ChessBoard;
 
 inline Colour getSideToMove(const ChessBoard *board) {
@@ -22,7 +19,11 @@ inline Bitboard getPieces(const ChessBoard *board, Colour c, PieceType pt) {
 }
 
 inline Bitboard getPiecesOnSide(const ChessBoard *board, Colour c) {
-    return board->piecesOnSide[c];
+    return board->pieces[c][ALL_PIECES];
+}
+
+inline Bitboard getOccupiedSquares(const ChessBoard *board) {
+    return board->pieces[WHITE][ALL_PIECES] | board->pieces[BLACK][ALL_PIECES];
 }
 
 void parseFEN(ChessBoard *board, const char *fenString);

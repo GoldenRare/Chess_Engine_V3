@@ -19,10 +19,24 @@ enum MagicIndex {
 };
 typedef enum MagicIndex MagicIndex;
 
+/* Does not include pawns */
+enum NonSliderAttacker {
+    KNIGHT_ATTACKER, KING_ATTACKER, NON_SLIDER_ATTACKERS
+};
+typedef enum NonSliderAttacker NonSliderAttacker;
+
 extern Magic magicTable[MAGIC_INDICES][SQUARES];
 extern Bitboard pawnAttacks[COLOURS][SQUARES];
-extern Bitboard pieceAttacks[PIECE_ATTACKS_SIZE][SQUARES];
+extern Bitboard nonSlidingAttacks[NON_SLIDER_ATTACKERS][SQUARES]; // Does not include pawns
 extern Bitboard slidingAttacks[MAX_SLIDING_ATTACKS];
+
+inline Bitboard getPawnAttacks(Colour c, Square sq) {
+    return pawnAttacks[c][sq];
+}
+
+inline Bitboard getNonSlidingAttacks(NonSliderAttacker nonSliderAttacker, Square sq) {
+    return nonSlidingAttacks[nonSliderAttacker][sq];
+}
 
 inline Bitboard getSlidingAttacks(Bitboard occupied, Square sq, MagicIndex index) {
     const Magic *magic = &magicTable[index][sq];
@@ -37,7 +51,8 @@ Bitboard generateKnightAttacks(Bitboard knightSq);
 Bitboard generateSlidingAttacks(const Direction directions[], size_t numDirections, Square sq, Bitboard occupied);
 Bitboard generateKingAttacks(Bitboard kingSq);
 
-void generateKnightMoves(const ChessBoard *board, Move *moveList);
+Move* generateAllMoves(const ChessBoard *board, Move *moveList);
+Move* generateKnightMoves(const ChessBoard *board, Move *moveList);
 
 /* Essentially checks if fromSq and toSq are within a king ring distance from each other. */
 bool isDirectionMaintained(Square fromSq, Square toSq); 
