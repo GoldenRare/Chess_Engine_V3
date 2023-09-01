@@ -37,13 +37,6 @@ enum Colour {
 };
 typedef enum Colour Colour;
 
-enum Piece {
-    WHITE_PAWN, WHITE_KNIGHT, WHITE_BISHOP, WHITE_ROOK, WHITE_QUEEN, WHITE_KING,
-    BLACK_PAWN, BLACK_KNIGHT, BLACK_BISHOP, BLACK_ROOK, BLACK_QUEEN, BLACK_KING,
-    PIECES
-};
-typedef enum Piece Piece;
-
 enum Direction {
     NORTH = 8, SOUTH = -8, EAST = -1, WEST = 1,
     NORTH_EAST = 7, NORTH_WEST = 9, SOUTH_EAST = -9, SOUTH_WEST = -7
