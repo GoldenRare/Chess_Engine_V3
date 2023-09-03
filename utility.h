@@ -85,8 +85,8 @@ inline Bitboard squareToBitboard(Square sq) {
     return 0x8000000000000000ULL >> sq;
 }
 
-inline Square toSquare(Square fromSq, Direction d) {
-    return fromSq - d;
+inline Square moveSquareInDirection(Square sq, Direction d) {
+    return sq - d;
 } 
 
 inline Bitboard shiftBitboard(Bitboard b, Direction d) {

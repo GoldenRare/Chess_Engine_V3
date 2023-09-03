@@ -61,14 +61,14 @@ Bitboard generateSlidingAttacks(const Direction directions[], size_t numDirectio
     Bitboard attacks = 0ULL;
     for (size_t i = 0; i < numDirections; i++) {
         Square fromSq = sq;
-        Square toSq = toSquare(sq, directions[i]);
+        Square toSq = moveSquareInDirection(sq, directions[i]);
         Bitboard toSquareBB = shiftBitboard(squareToBitboard(sq), directions[i]);
         while (toSquareBB && isDirectionMaintained(fromSq, toSq)) {
             attacks |= toSquareBB;
             if (toSquareBB & occupied) break;
             toSquareBB = shiftBitboard(toSquareBB, directions[i]);
             fromSq = toSq;
-            toSq = toSquare(fromSq, directions[i]);
+            toSq = moveSquareInDirection(fromSq, directions[i]);
         }
     }
     return attacks;
