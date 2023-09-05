@@ -55,6 +55,11 @@ enum Square {
 };
 typedef enum Square Square;
 
+enum MoveType {
+    QUIET, CAPTURE = 4
+};
+typedef enum MoveType MoveType;
+
 enum Rank {
     RANK_1, RANK_2, RANK_3, RANK_4, RANK_5, RANK_6, RANK_7, RANK_8, RANKS
 };
@@ -113,12 +118,20 @@ inline void setToSquare(Move *move, Square sq) {
     *move |= sq << 6;
 }
 
+inline void setMoveType(Move *move, MoveType mt) {
+    *move |= mt << 12;
+}
+
 inline Square getFromSquare(const Move *move) {
     return *move & 0x3F;
 }
 
 inline Square getToSquare(const Move *move) {
     return *move >> 6 & 0x3F;
+}
+
+inline MoveType getMoveType(const Move *move) {
+    return *move >> 12 & 0x3F;
 }
 
 inline int populationCount(Bitboard b) {
