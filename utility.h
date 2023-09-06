@@ -110,16 +110,8 @@ inline Square bitboardToSquareWithReset(Bitboard *b) {
     return sq;
 }
 
-inline void setFromSquare(Move *move, Square sq) {
-    *move |= sq;
-}
-
-inline void setToSquare(Move *move, Square sq) {
-    *move |= sq << 6;
-}
-
-inline void setMoveType(Move *move, MoveType mt) {
-    *move |= mt << 12;
+inline void setMove(Move *move, Square fromSquare, Square toSquare, MoveType moveType) {
+    *move = moveType << 12 | toSquare << 6 | fromSquare;
 }
 
 inline Square getFromSquare(const Move *move) {
@@ -131,7 +123,7 @@ inline Square getToSquare(const Move *move) {
 }
 
 inline MoveType getMoveType(const Move *move) {
-    return *move >> 12 & 0x3F;
+    return *move >> 12;
 }
 
 inline int populationCount(Bitboard b) {

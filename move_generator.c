@@ -85,3 +85,58 @@ bool isDirectionMaintained(Square fromSq, Square toSq) {
     int fileDistance = abs(squareToFile(toSq) - squareToFile(fromSq));
     return max(rankDistance, fileDistance) == 1;
 }
+
+Move* generateAllMoves(const ChessBoard *board, Move *moveList) {
+    moveList = generatePawnMoves(board, moveList);
+    moveList = generateKnightMoves(board, moveList);
+    return moveList;
+}
+
+Move* generatePawnMoves(const ChessBoard *board, Move *moveList) {
+    Colour stm = getSideToMove(board);
+    Bitboard stmPawns = getPieces(board, stm, PAWN);
+    Bitboard enemyPieces = getPiecesOnSide(board, stm ^ 1);
+    Bitboard empty = ~getOccupiedSquares(board);
+    Direction pawnPush = stm ? SOUTH : NORTH;
+    Bitboard relative4thRank = stm ? RANK_5_BB : RANK_4_BB;
+
+    Bitboard pawnsAbleToPush = shiftBitboard(stmPawns, pawnPush) & empty;
+    Bitboard pawnsAbleToPushTwice = shiftBitboard(pawnsAbleToPush, pawnPush) & empty & relative4thRank;
+
+    while (stmPawns) {
+        Square fromSq = bitboardToSquareWithReset(&stmPawns);
+        Bitboard captures = pawnAttacks[stm][fromSq] & enemyPieces;
+        while (captures) setMove(moveList++, fromSq, bitboardToSquareWithReset(&captures), CAPTURE);
+    }
+
+    while (pawnsAbleToPush) {
+        Square toSq = bitboardToSquareWithReset(&pawnsAbleToPush);
+        Square fromSq = moveSquareInDirection(toSq, -pawnPush);
+        setMove(moveList++, fromSq, toSq, QUIET);
+    }
+
+    while (pawnsAbleToPushTwice) {
+        Square toSq = bitboardToSquareWithReset(&pawnsAbleToPushTwice);
+        Square fromSq = moveSquareInDirection(toSq, 2 * -pawnPush);
+        setMove(moveList++, fromSq, toSq, QUIET);
+    }
+    return moveList;
+}
+
+Move* generateKnightMoves(const ChessBoard *board, Move *moveList) {
+    Colour stm = getSideToMove(board);
+    Bitboard stmKnights = getPieces(board, stm, KNIGHT);
+    Bitboard stmPieces = getPiecesOnSide(board, stm);
+    Bitboard enemyPieces = getPiecesOnSide(board, stm ^ 1);
+
+    while (stmKnights) {
+        Square fromSq = bitboardToSquareWithReset(&stmKnights);
+        Bitboard validAttacks = nonSlidingAttacks[KNIGHT_ATTACKER][fromSq] & ~stmPieces;
+        Bitboard captures = validAttacks & enemyPieces;
+        Bitboard quiets = validAttacks ^ captures;
+        
+        while (captures) setMove(moveList++, fromSq, bitboardToSquareWithReset(&captures), CAPTURE);
+        while (quiets) setMove(moveList++, fromSq, bitboardToSquareWithReset(&quiets), QUIET);
+    }
+    return moveList;
+}

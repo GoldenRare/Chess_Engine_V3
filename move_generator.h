@@ -52,6 +52,7 @@ Bitboard generateSlidingAttacks(const Direction directions[], size_t numDirectio
 Bitboard generateKingAttacks(Bitboard kingSq);
 
 Move* generateAllMoves(const ChessBoard *board, Move *moveList);
+Move* generatePawnMoves(const ChessBoard *board, Move *moveList);
 Move* generateKnightMoves(const ChessBoard *board, Move *moveList);
 
 /* Essentially checks if fromSq and toSq are within a king ring distance from each other. */

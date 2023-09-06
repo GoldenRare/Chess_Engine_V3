@@ -28,7 +28,11 @@ inline Bitboard getOccupiedSquares(const ChessBoard *board) {
 
 void parseFEN(ChessBoard *board, const char *fenString);
 void addPiece(ChessBoard *board, Colour c, PieceType pt, Square sq);
-void movePiece(ChessBoard *board, Square fromSquare, Square toSquare);
+
+// Assumes that the piece is moving to an EMPTY square
+void movePiece(ChessBoard *board, Colour c, PieceType pt, Square fromSquare, Square toSquare); 
+
+void removePiece(ChessBoard *board, Colour c, PieceType pt, Square sq);
 void makeMove(ChessBoard *board, const Move *move);
 
 bool isSquareAttacked(const ChessBoard *board, Square sq, Colour attackedSide);
