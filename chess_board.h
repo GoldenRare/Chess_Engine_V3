@@ -18,10 +18,6 @@ inline Bitboard getPieces(const ChessBoard *board, Colour c, PieceType pt) {
     return board->pieces[c][pt];
 }
 
-inline Bitboard getPiecesOnSide(const ChessBoard *board, Colour c) {
-    return board->pieces[c][ALL_PIECES];
-}
-
 inline Bitboard getOccupiedSquares(const ChessBoard *board) {
     return board->pieces[WHITE][ALL_PIECES] | board->pieces[BLACK][ALL_PIECES];
 }

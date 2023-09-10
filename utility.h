@@ -56,7 +56,7 @@ enum Square {
 typedef enum Square Square;
 
 enum MoveType {
-    QUIET, CAPTURE = 4
+    QUIET, DOUBLE_PAWN_PUSH, CAPTURE = 4
 };
 typedef enum MoveType MoveType;
 

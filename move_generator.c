@@ -89,13 +89,17 @@ bool isDirectionMaintained(Square fromSq, Square toSq) {
 Move* generateAllMoves(const ChessBoard *board, Move *moveList) {
     moveList = generatePawnMoves(board, moveList);
     moveList = generateKnightMoves(board, moveList);
+    moveList = generateSlidingMoves(board, moveList, BISHOP, BISHOP_INDEX);
+    moveList = generateSlidingMoves(board, moveList, ROOK, ROOK_INDEX);
+    moveList = generateSlidingMoves(board, moveList, QUEEN, ROOK_INDEX); // BISHOP_INDEX is computed for Queen in function
+    moveList = generateKingMoves(board, moveList);
     return moveList;
 }
 
 Move* generatePawnMoves(const ChessBoard *board, Move *moveList) {
     Colour stm = getSideToMove(board);
     Bitboard stmPawns = getPieces(board, stm, PAWN);
-    Bitboard enemyPieces = getPiecesOnSide(board, stm ^ 1);
+    Bitboard enemyPieces = getPieces(board, stm ^ 1, ALL_PIECES);
     Bitboard empty = ~getOccupiedSquares(board);
     Direction pawnPush = stm ? SOUTH : NORTH;
     Bitboard relative4thRank = stm ? RANK_5_BB : RANK_4_BB;
@@ -105,7 +109,7 @@ Move* generatePawnMoves(const ChessBoard *board, Move *moveList) {
 
     while (stmPawns) {
         Square fromSq = bitboardToSquareWithReset(&stmPawns);
-        Bitboard captures = pawnAttacks[stm][fromSq] & enemyPieces;
+        Bitboard captures = getPawnAttacks(stm, fromSq) & enemyPieces;
         while (captures) setMove(moveList++, fromSq, bitboardToSquareWithReset(&captures), CAPTURE);
     }
 
@@ -118,7 +122,7 @@ Move* generatePawnMoves(const ChessBoard *board, Move *moveList) {
     while (pawnsAbleToPushTwice) {
         Square toSq = bitboardToSquareWithReset(&pawnsAbleToPushTwice);
         Square fromSq = moveSquareInDirection(toSq, 2 * -pawnPush);
-        setMove(moveList++, fromSq, toSq, QUIET);
+        setMove(moveList++, fromSq, toSq, DOUBLE_PAWN_PUSH);
     }
     return moveList;
 }
@@ -126,12 +130,51 @@ Move* generatePawnMoves(const ChessBoard *board, Move *moveList) {
 Move* generateKnightMoves(const ChessBoard *board, Move *moveList) {
     Colour stm = getSideToMove(board);
     Bitboard stmKnights = getPieces(board, stm, KNIGHT);
-    Bitboard stmPieces = getPiecesOnSide(board, stm);
-    Bitboard enemyPieces = getPiecesOnSide(board, stm ^ 1);
+    Bitboard stmPieces = getPieces(board, stm, ALL_PIECES);
+    Bitboard enemyPieces = getPieces(board, stm ^ 1, ALL_PIECES);
 
     while (stmKnights) {
         Square fromSq = bitboardToSquareWithReset(&stmKnights);
-        Bitboard validAttacks = nonSlidingAttacks[KNIGHT_ATTACKER][fromSq] & ~stmPieces;
+        Bitboard validAttacks = getNonSlidingAttacks(KNIGHT_ATTACKER, fromSq) & ~stmPieces;
+        Bitboard captures = validAttacks & enemyPieces;
+        Bitboard quiets = validAttacks ^ captures;
+        
+        while (captures) setMove(moveList++, fromSq, bitboardToSquareWithReset(&captures), CAPTURE);
+        while (quiets) setMove(moveList++, fromSq, bitboardToSquareWithReset(&quiets), QUIET);
+    }
+    return moveList;
+}
+
+Move* generateSlidingMoves(const ChessBoard *board, Move *moveList, PieceType pt, MagicIndex slidingIndex) {
+    Colour stm = getSideToMove(board);
+    Bitboard stmMovingPieces = getPieces(board, stm, pt);
+    Bitboard stmPieces = getPieces(board, stm, ALL_PIECES);
+    Bitboard enemyPieces = getPieces(board, stm ^ 1, ALL_PIECES);
+    Bitboard occupied = stmPieces | enemyPieces; 
+
+    while (stmMovingPieces) {
+        Square fromSq = bitboardToSquareWithReset(&stmMovingPieces);
+        Bitboard validAttacks = getSlidingAttacks(occupied, fromSq, slidingIndex);
+        if (pt == QUEEN) validAttacks |= getSlidingAttacks(occupied, fromSq, BISHOP_INDEX);
+
+        Bitboard captures = validAttacks & enemyPieces;
+        Bitboard quiets = (validAttacks & ~stmPieces) ^ captures;
+        
+        while (captures) setMove(moveList++, fromSq, bitboardToSquareWithReset(&captures), CAPTURE);
+        while (quiets) setMove(moveList++, fromSq, bitboardToSquareWithReset(&quiets), QUIET);
+    }
+    return moveList;
+}
+
+Move* generateKingMoves(const ChessBoard *board, Move *moveList) {
+    Colour stm = getSideToMove(board);
+    Bitboard stmKing = getPieces(board, stm, KING);
+    Bitboard stmPieces = getPieces(board, stm, ALL_PIECES);
+    Bitboard enemyPieces = getPieces(board, stm ^ 1, ALL_PIECES);
+
+    while (stmKing) {
+        Square fromSq = bitboardToSquareWithReset(&stmKing);
+        Bitboard validAttacks = getNonSlidingAttacks(KING_ATTACKER, fromSq) & ~stmPieces;
         Bitboard captures = validAttacks & enemyPieces;
         Bitboard quiets = validAttacks ^ captures;
         
