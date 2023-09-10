@@ -70,6 +70,11 @@ enum File {
 };
 typedef enum File File;
 
+enum CastlingRights {
+    WHITE_KINGSIDE = 1, WHITE_QUEENSIDE = 2, BLACK_KINGSIDE = 4, BLACK_QUEENSIDE = 8
+};
+typedef enum CastlingRights CastlingRights;
+
 inline Rank squareToRank(Square sq) {
     return RANK_8 - (sq >> 3);
 }
