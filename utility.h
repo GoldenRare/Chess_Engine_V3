@@ -51,12 +51,12 @@ enum Square {
     A3, B3, C3, D3, E3, F3, G3, H3,
     A2, B2, C2, D2, E2, F2, G2, H2,
     A1, B1, C1, D1, E1, F1, G1, H1,
-    SQUARES
+    SQUARES, NO_SQUARE
 };
 typedef enum Square Square;
 
 enum MoveType {
-    QUIET, DOUBLE_PAWN_PUSH, CAPTURE = 4
+    QUIET, DOUBLE_PAWN_PUSH, CAPTURE = 4, EN_PASSANT_CAPTURE
 };
 typedef enum MoveType MoveType;
 
