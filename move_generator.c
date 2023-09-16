@@ -98,19 +98,59 @@ Move* generateAllMoves(const ChessBoard *board, Move *moveList) {
 
 Move* generatePawnMoves(const ChessBoard *board, Move *moveList) {
     Colour stm = getSideToMove(board);
+    Colour enemy = stm ^ 1;
     Bitboard stmPawns = getPieces(board, stm, PAWN);
-    Bitboard enemyPieces = getPieces(board, stm ^ 1, ALL_PIECES);
+    Bitboard enemyPieces = getPieces(board, enemy, ALL_PIECES);
     Bitboard empty = ~getOccupiedSquares(board);
+    Square enPassant = getEnPassantSquare(board);
+
     Direction pawnPush = stm ? SOUTH : NORTH;
     Bitboard relative4thRank = stm ? RANK_5_BB : RANK_4_BB;
-
-    Bitboard pawnsAbleToPush = shiftBitboard(stmPawns, pawnPush) & empty;
+    Bitboard relative7thRank = stm ? RANK_2_BB : RANK_7_BB;
+    
+    Bitboard pawnsOn7thRank = stmPawns & relative7thRank;
+    Bitboard pawnsNotOn7thRank = stmPawns ^ pawnsOn7thRank;
+    Bitboard enPassantCapturers = enPassant != NO_SQUARE ? getPawnAttacks(enemy, enPassant) & pawnsNotOn7thRank : 0;
+    Bitboard pawnsAbleToPush = shiftBitboard(pawnsNotOn7thRank, pawnPush) & empty;
     Bitboard pawnsAbleToPushTwice = shiftBitboard(pawnsAbleToPush, pawnPush) & empty & relative4thRank;
+    Bitboard promotions = shiftBitboard(pawnsOn7thRank, pawnPush) & empty;
 
-    while (stmPawns) {
-        Square fromSq = bitboardToSquareWithReset(&stmPawns);
+    /* PAWNS ON 7th RANK HANDLING */
+    while (pawnsOn7thRank) {
+        Square fromSq = bitboardToSquareWithReset(&pawnsOn7thRank);
+        Bitboard captures = getPawnAttacks(stm, fromSq) & enemyPieces;
+        while (captures) {
+            Square toSq = bitboardToSquareWithReset(&captures);
+            setMove(moveList++, fromSq, toSq, QUEEN_PROMOTION_CAPTURE);
+            setMove(moveList++, fromSq, toSq, ROOK_PROMOTION_CAPTURE);
+            setMove(moveList++, fromSq, toSq, BISHOP_PROMOTION_CAPTURE);
+            setMove(moveList++, fromSq, toSq, KNIGHT_PROMOTION_CAPTURE);
+        } 
+    }
+
+    while (promotions) {
+        Square toSq = bitboardToSquareWithReset(&promotions);
+        Square fromSq = moveSquareInDirection(toSq, -pawnPush);
+        setMove(moveList++, fromSq, toSq, QUEEN_PROMOTION);
+        setMove(moveList++, fromSq, toSq, ROOK_PROMOTION);
+        setMove(moveList++, fromSq, toSq, BISHOP_PROMOTION);
+        setMove(moveList++, fromSq, toSq, KNIGHT_PROMOTION);
+    }
+    /*                            */
+
+    /* PAWNS NOT ON 7th RANK HANDLING */
+    while (pawnsNotOn7thRank) {
+        Square fromSq = bitboardToSquareWithReset(&pawnsNotOn7thRank);
         Bitboard captures = getPawnAttacks(stm, fromSq) & enemyPieces;
         while (captures) setMove(moveList++, fromSq, bitboardToSquareWithReset(&captures), CAPTURE);
+    }
+
+    while (enPassantCapturers) setMove(moveList++, bitboardToSquareWithReset(&enPassantCapturers), enPassant, EN_PASSANT_CAPTURE);
+
+    while (pawnsAbleToPushTwice) {
+        Square toSq = bitboardToSquareWithReset(&pawnsAbleToPushTwice);
+        Square fromSq = moveSquareInDirection(toSq, 2 * -pawnPush);
+        setMove(moveList++, fromSq, toSq, DOUBLE_PAWN_PUSH);
     }
 
     while (pawnsAbleToPush) {
@@ -118,12 +158,8 @@ Move* generatePawnMoves(const ChessBoard *board, Move *moveList) {
         Square fromSq = moveSquareInDirection(toSq, -pawnPush);
         setMove(moveList++, fromSq, toSq, QUIET);
     }
+    /*                                */
 
-    while (pawnsAbleToPushTwice) {
-        Square toSq = bitboardToSquareWithReset(&pawnsAbleToPushTwice);
-        Square fromSq = moveSquareInDirection(toSq, 2 * -pawnPush);
-        setMove(moveList++, fromSq, toSq, DOUBLE_PAWN_PUSH);
-    }
     return moveList;
 }
 
