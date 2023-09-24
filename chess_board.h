@@ -9,6 +9,7 @@ typedef struct ChessBoard {
     PieceType pieceTypes[SQUARES];
     Bitboard pieces[COLOURS][PIECE_TYPES];
     Square enPassant;
+    CastlingRights castlingRights;
 } ChessBoard;
 
 inline Colour getSideToMove(const ChessBoard *board) {
@@ -25,6 +26,10 @@ inline Bitboard getOccupiedSquares(const ChessBoard *board) {
 
 inline Square getEnPassantSquare(const ChessBoard *board) {
     return board->enPassant;
+}
+
+inline CastlingRights getCastlingRights(const ChessBoard *board) {
+    return board->castlingRights;
 }
 
 void parseFEN(ChessBoard *board, const char *fenString);
