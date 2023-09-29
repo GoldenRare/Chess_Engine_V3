@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include "uci.h"
 #include "benchmark.h"
 
@@ -41,5 +42,6 @@ void processIsReadyCommand() {
 }
 
 void processBenchmarkCommand() {
-    runBenchmark();
+    char *depth = strtok(NULL, " ");
+    runBenchmark(strtol(depth, NULL, 10));
 }
