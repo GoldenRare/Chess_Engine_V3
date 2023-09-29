@@ -14,6 +14,8 @@ void runBenchmark(int depth) {
     char *token = "";
     char line[256];
 
+    double totalTime = 0;
+    uint64_t totalNodes = 0;
     const int MAX_DEPTH = 6;
     int correct = 0;
     int totalPositions = 0;
@@ -33,11 +35,15 @@ void runBenchmark(int depth) {
         clock_t end = clock();
         double time = (double) (end - start) / CLOCKS_PER_SEC;
         double nps = time > 0.0 ? nodes / time : nodes / 0.001;
+        totalTime += time;
+        totalNodes += nodes;
         
         if (expectedNodes == nodes) correct++;
         printf("info depth %d time %.0lf nodes %" PRIu64 " nps %.0lf\n", depth, time * 1000.0, nodes, nps);
     }
+    double nps = totalTime > 0.0 ? totalNodes / totalTime : totalNodes / 0.001;
     printf("Result: %d/%d\n", correct, totalPositions);
+    printf("Overall: info depth %d time %.0lf nodes %" PRIu64 " nps %.0lf\n", depth, totalTime * 1000, totalNodes, nps);
     fclose(perftFile);
 }
 
