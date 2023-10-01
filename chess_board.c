@@ -1,7 +1,20 @@
 #include <stdio.h>
+#include <stdbool.h>
 #include "chess_board.h"
 #include "utility.h"
 #include "move_generator.h"
+
+// Bit representation: 1s represent the castling rights to stay on, 0s represent the castling rights to turn off
+static const CastlingRights CASTLING_RIGHTS_MASK[SQUARES] = {
+    [A1] = BLACK_RIGHTS | WHITE_KINGSIDE, [B1] = ALL_RIGHTS, [C1] = ALL_RIGHTS, [D1] = ALL_RIGHTS, [E1] = BLACK_RIGHTS, [F1] = ALL_RIGHTS, [G1] = ALL_RIGHTS, [H1] = BLACK_RIGHTS | WHITE_QUEENSIDE,
+    [A2] = ALL_RIGHTS,                    [B2] = ALL_RIGHTS, [C2] = ALL_RIGHTS, [D2] = ALL_RIGHTS, [E2] = ALL_RIGHTS,   [F2] = ALL_RIGHTS, [G2] = ALL_RIGHTS, [H2] = ALL_RIGHTS,
+    [A3] = ALL_RIGHTS,                    [B3] = ALL_RIGHTS, [C3] = ALL_RIGHTS, [D3] = ALL_RIGHTS, [E3] = ALL_RIGHTS,   [F3] = ALL_RIGHTS, [G3] = ALL_RIGHTS, [H3] = ALL_RIGHTS,
+    [A4] = ALL_RIGHTS,                    [B4] = ALL_RIGHTS, [C4] = ALL_RIGHTS, [D4] = ALL_RIGHTS, [E4] = ALL_RIGHTS,   [F4] = ALL_RIGHTS, [G4] = ALL_RIGHTS, [H4] = ALL_RIGHTS,
+    [A5] = ALL_RIGHTS,                    [B5] = ALL_RIGHTS, [C5] = ALL_RIGHTS, [D5] = ALL_RIGHTS, [E5] = ALL_RIGHTS,   [F5] = ALL_RIGHTS, [G5] = ALL_RIGHTS, [H5] = ALL_RIGHTS,
+    [A6] = ALL_RIGHTS,                    [B6] = ALL_RIGHTS, [C6] = ALL_RIGHTS, [D6] = ALL_RIGHTS, [E6] = ALL_RIGHTS,   [F6] = ALL_RIGHTS, [G6] = ALL_RIGHTS, [H6] = ALL_RIGHTS,
+    [A7] = ALL_RIGHTS,                    [B7] = ALL_RIGHTS, [C7] = ALL_RIGHTS, [D7] = ALL_RIGHTS, [E7] = ALL_RIGHTS,   [F7] = ALL_RIGHTS, [G7] = ALL_RIGHTS, [H7] = ALL_RIGHTS,
+    [A8] = BLACK_KINGSIDE | WHITE_RIGHTS, [B8] = ALL_RIGHTS, [C8] = ALL_RIGHTS, [D8] = ALL_RIGHTS, [E8] = WHITE_RIGHTS, [F8] = ALL_RIGHTS, [G8] = ALL_RIGHTS, [H8] = BLACK_QUEENSIDE | WHITE_RIGHTS,
+};
 
 void parseFEN(ChessBoard *board, const char *fenString) {
     static const Colour CHAR_TO_COLOUR[128] = {
@@ -21,7 +34,13 @@ void parseFEN(ChessBoard *board, const char *fenString) {
         ['Q'] = QUEEN , ['q'] = QUEEN , 
         ['K'] = KING  , ['k'] = KING
     };
+    static const CastlingRights CHAR_TO_CASTLING_RIGHTS[128] = {
+        ['Q'] = WHITE_QUEENSIDE, ['q'] = BLACK_QUEENSIDE, 
+        ['K'] = WHITE_KINGSIDE , ['k'] = BLACK_KINGSIDE,
+        ['-'] = 0
+    };
 
+    /* 1) Piece Placement */
     Square sq = A8;
     while (*fenString != ' ') {
         unsigned char ch = *fenString++;
@@ -32,10 +51,21 @@ void parseFEN(ChessBoard *board, const char *fenString) {
         }
     }
 
+    /* 2) Side to Move */
     board->sideToMove = CHAR_TO_COLOUR[(unsigned char)*++fenString];
+    fenString++;
 
-
-    board->enPassant = NO_SQUARE;
+    /* 3) Castling Ability */
+    while (*++fenString != ' ') board->castlingRights |= CHAR_TO_CASTLING_RIGHTS[(unsigned char) *fenString];
+    
+    /* 4) En Passant Target Square */
+    if (*++fenString != '-') {
+            int file = *fenString - 'a';
+            int rank = *++fenString - '8';
+            board->enPassant = rank * -8 + file;
+    } else {
+        board->enPassant = NO_SQUARE;
+    }
 }
 
 void addPiece(ChessBoard *board, Colour c, PieceType pt, Square sq) {
@@ -65,47 +95,41 @@ void makeMove(ChessBoard *board, const Move *move) {
     Square toSquare = getToSquare(move);
     MoveType moveType = getMoveType(move);
     Colour stm = board->sideToMove;
-    Direction pawnPush = stm ? SOUTH : NORTH;
-    PieceType movingPiece = board->pieceTypes[fromSquare];
-    PieceType capturedPiece = moveType == EN_PASSANT_CAPTURE ? PAWN : board->pieceTypes[toSquare];
-    Square captureSquare = moveType == EN_PASSANT_CAPTURE ? moveSquareInDirection(toSquare, -pawnPush) : toSquare;
     
-    if (moveType & CAPTURE) removePiece(board, stm ^ 1, capturedPiece, captureSquare);
+    if (moveType & CAPTURE) {
+        bool isEnPassantCapture = moveType == EN_PASSANT_CAPTURE;
+        PieceType capturedPiece = isEnPassantCapture ? PAWN : board->pieceTypes[toSquare];
+        Square captureSquare = isEnPassantCapture ? moveSquareInDirection(toSquare, stm ? NORTH : SOUTH) : toSquare;
+        removePiece(board, stm ^ 1, capturedPiece, captureSquare);
+    } else if (moveType == KINGSIDE_CASTLE || moveType == QUEENSIDE_CASTLE) {
+        bool isQueenSideCastle = moveType & 1;
+        Square rookFromSquare = isQueenSideCastle ? moveSquareInDirection(toSquare, WEST + WEST) : moveSquareInDirection(toSquare, EAST);
+        Square rookToSquare   = isQueenSideCastle ? moveSquareInDirection(fromSquare, WEST)      : moveSquareInDirection(fromSquare, EAST);
+        movePiece(board, stm, ROOK, rookFromSquare, rookToSquare);
+    } 
+    
     if (moveType & PROMOTION) {
-        addPiece(board, stm, KNIGHT + (moveType & 0b11), toSquare);
+        addPiece(board, stm, KNIGHT + (moveType & PROMOTION_PIECE_OFFSET_MASK), toSquare);
         removePiece(board, stm, PAWN, fromSquare);
     } else {
-        movePiece(board, stm, movingPiece, fromSquare, toSquare);
+        movePiece(board, stm, board->pieceTypes[fromSquare], fromSquare, toSquare);
     }
-    board->enPassant = moveType == DOUBLE_PAWN_PUSH ? moveSquareInDirection(toSquare, -pawnPush) : NO_SQUARE;
+
+    if (board->castlingRights) board->castlingRights &= CASTLING_RIGHTS_MASK[fromSquare] & CASTLING_RIGHTS_MASK[toSquare];
+    board->enPassant = moveType == DOUBLE_PAWN_PUSH ? moveSquareInDirection(toSquare, stm ? NORTH : SOUTH) : NO_SQUARE;
     board->sideToMove ^= 1;
-    
 }
 
 bool isSquareAttacked(const ChessBoard *board, Square sq, Colour attackedSide) {
     Colour enemy = attackedSide ^ 1;
     Bitboard occupied = getOccupiedSquares(board);
-    Bitboard enemyPawns = board->pieces[enemy][PAWN];
-    Bitboard enemyKnights = board->pieces[enemy][KNIGHT];
-    Bitboard enemyBishopsQueens = board->pieces[enemy][BISHOP] | board->pieces[enemy][QUEEN];
-    Bitboard enemyRooksQueens = board->pieces[enemy][ROOK] | board->pieces[enemy][QUEEN];
-    Bitboard enemyKing = board->pieces[enemy][KING];
-    return (getPawnAttacks(attackedSide, sq) & enemyPawns) 
-         | (getNonSlidingAttacks(KNIGHT_ATTACKER, sq) & enemyKnights)
-         | (getSlidingAttacks(occupied, sq, BISHOP_INDEX) & enemyBishopsQueens)
-         | (getSlidingAttacks(occupied, sq, ROOK_INDEX) & enemyRooksQueens)
-         | (getNonSlidingAttacks(KING_ATTACKER, sq) & enemyKing);
+    Bitboard queens = getPieces(board, enemy, QUEEN);
+    return (getPawnAttacks(attackedSide, sq)              &  getPieces(board, enemy, PAWN))
+         | (getNonSlidingAttacks(KNIGHT_ATTACKER, sq)     &  getPieces(board, enemy, KNIGHT))
+         | (getSlidingAttacks(occupied, sq, BISHOP_INDEX) & (getPieces(board, enemy, BISHOP) | queens))
+         | (getSlidingAttacks(occupied, sq, ROOK_INDEX)   & (getPieces(board, enemy, ROOK)   | queens))
+         | (getNonSlidingAttacks(KING_ATTACKER, sq)       &  getPieces(board, enemy, KING));
 }
-
-/*bool isSquareAttacked(const ChessBoard *board, Square sq, Colour attackedSide) {
-    Colour enemy = attackedSide ^ 1;
-    if (pawnAttacks[attackedSide][sq] & board->pieces2[enemy][PAWN]) return true;
-    if (pieceAttacks[KNIGHT][sq] & board->pieces2[enemy][KNIGHT]) return true;
-    if (getSlidingAttacks(board->occupied, sq, BISHOP_INDEX) & (board->pieces2[enemy][BISHOP] | board->pieces2[enemy][QUEEN])) return true;
-    if (getSlidingAttacks(board->occupied, sq, ROOK_INDEX) & (board->pieces2[enemy][ROOK] | board->pieces2[enemy][QUEEN])) return true;
-    if (pieceAttacks[KING][sq] & board->pieces2[enemy][KING]) return true;
-    return false;
-}*/
 
 void printBitboard(Bitboard b) {
     printf("_________________________________\n");
