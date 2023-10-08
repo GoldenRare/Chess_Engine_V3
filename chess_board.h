@@ -12,6 +12,13 @@ typedef struct ChessBoard {
     CastlingRights castlingRights;
 } ChessBoard;
 
+// Keeps track of the information that is lost when a move is made
+typedef struct IrreversibleBoardState {
+    PieceType capturedPiece;
+    Square enPassant;
+    CastlingRights castlingRights;
+} IrreversibleBoardState;
+
 inline Colour getSideToMove(const ChessBoard *board) {
     return board->sideToMove;
 }
@@ -39,7 +46,8 @@ void addPiece(ChessBoard *board, Colour c, PieceType pt, Square sq);
 void movePiece(ChessBoard *board, Colour c, PieceType pt, Square fromSquare, Square toSquare); 
 
 void removePiece(ChessBoard *board, Colour c, PieceType pt, Square sq);
-void makeMove(ChessBoard *board, const Move *move);
+void makeMove(ChessBoard *board, const Move *move, IrreversibleBoardState *ibs);
+void undoMove(ChessBoard *board, const Move *move, const IrreversibleBoardState *ibs);
 
 bool isSquareAttacked(const ChessBoard *board, Square sq, Colour attackedSide);
 

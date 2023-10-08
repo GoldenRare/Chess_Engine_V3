@@ -47,7 +47,7 @@ void runBenchmark(int depth) {
     fclose(perftFile);
 }
 
-uint64_t perft(const ChessBoard *board, int depth) {
+uint64_t perft(ChessBoard *board, int depth) {
     if (depth == 0) return 1ULL;
 
     uint64_t nodes = 0;
@@ -55,11 +55,13 @@ uint64_t perft(const ChessBoard *board, int depth) {
     Move *startList = moveList;
     Move *endList = generateAllMoves(board, startList);
     while (startList < endList) {
-        ChessBoard copyBoard = *board;
-        makeMove(&copyBoard, startList);
-        if (!isSquareAttacked(&copyBoard, bitboardToSquare(getPieces(&copyBoard, board->sideToMove, KING)), board->sideToMove)) {
-            nodes += perft(&copyBoard, depth - 1);
+        IrreversibleBoardState ibs;
+        Colour stm = board->sideToMove;
+        makeMove(board, startList, &ibs);
+        if (!isSquareAttacked(board, bitboardToSquare(getPieces(board, stm, KING)), stm)) {
+            nodes += perft(board, depth - 1);
         }
+        undoMove(board, startList, &ibs);
         startList++;
     }
 

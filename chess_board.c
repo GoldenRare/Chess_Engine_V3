@@ -90,7 +90,7 @@ void removePiece(ChessBoard *board, Colour c, PieceType pt, Square sq) {
     board->pieces[c][ALL_PIECES] ^= sqBB;
 }
 
-void makeMove(ChessBoard *board, const Move *move) {
+void makeMove(ChessBoard *board, const Move *move, IrreversibleBoardState *ibs) {
     Square fromSquare = getFromSquare(move);
     Square toSquare = getToSquare(move);
     MoveType moveType = getMoveType(move);
@@ -100,6 +100,7 @@ void makeMove(ChessBoard *board, const Move *move) {
         bool isEnPassantCapture = moveType == EN_PASSANT_CAPTURE;
         PieceType capturedPiece = isEnPassantCapture ? PAWN : board->pieceTypes[toSquare];
         Square captureSquare = isEnPassantCapture ? moveSquareInDirection(toSquare, stm ? NORTH : SOUTH) : toSquare;
+        ibs->capturedPiece = capturedPiece;
         removePiece(board, stm ^ 1, capturedPiece, captureSquare);
     } else if (moveType == KINGSIDE_CASTLE || moveType == QUEENSIDE_CASTLE) {
         bool isQueenSideCastle = moveType & 1;
@@ -115,9 +116,41 @@ void makeMove(ChessBoard *board, const Move *move) {
         movePiece(board, stm, board->pieceTypes[fromSquare], fromSquare, toSquare);
     }
 
+    ibs->castlingRights = board->castlingRights;
+    ibs->enPassant = board->enPassant;
     if (board->castlingRights) board->castlingRights &= CASTLING_RIGHTS_MASK[fromSquare] & CASTLING_RIGHTS_MASK[toSquare];
     board->enPassant = moveType == DOUBLE_PAWN_PUSH ? moveSquareInDirection(toSquare, stm ? NORTH : SOUTH) : NO_SQUARE;
     board->sideToMove ^= 1;
+}
+
+void undoMove(ChessBoard *board, const Move *move, const IrreversibleBoardState *ibs) {
+    board->sideToMove ^= 1;
+    board->enPassant = ibs->enPassant;
+    board->castlingRights = ibs->castlingRights;
+    
+    Square fromSquare = getFromSquare(move);
+    Square toSquare = getToSquare(move);
+    MoveType moveType = getMoveType(move);
+    Colour stm = board->sideToMove;
+    
+    if (moveType & PROMOTION) {
+        removePiece(board, stm, board->pieceTypes[toSquare], toSquare);
+        addPiece(board, stm, PAWN, fromSquare);
+    } else {
+        movePiece(board, stm, board->pieceTypes[toSquare], toSquare, fromSquare);
+    }
+
+    if (moveType & CAPTURE) {
+        bool isEnPassantCapture = moveType == EN_PASSANT_CAPTURE;
+        PieceType capturedPiece = ibs->capturedPiece;
+        Square captureSquare = isEnPassantCapture ? moveSquareInDirection(toSquare, stm ? NORTH : SOUTH) : toSquare;
+        addPiece(board, stm ^ 1, capturedPiece, captureSquare);
+    } else if (moveType == KINGSIDE_CASTLE || moveType == QUEENSIDE_CASTLE) {
+        bool isQueenSideCastle = moveType & 1;
+        Square rookFromSquare = isQueenSideCastle ? moveSquareInDirection(toSquare, WEST + WEST) : moveSquareInDirection(toSquare, EAST);
+        Square rookToSquare   = isQueenSideCastle ? moveSquareInDirection(fromSquare, WEST)      : moveSquareInDirection(fromSquare, EAST);
+        movePiece(board, stm, ROOK, rookToSquare, rookFromSquare);
+    } 
 }
 
 bool isSquareAttacked(const ChessBoard *board, Square sq, Colour attackedSide) {

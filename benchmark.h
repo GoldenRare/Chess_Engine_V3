@@ -5,6 +5,6 @@
 #include "chess_board.h"
 
 void runBenchmark();
-uint64_t perft(const ChessBoard *board, int depth);
+uint64_t perft(ChessBoard *board, int depth);
 
 #endif
