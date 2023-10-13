@@ -26,7 +26,7 @@ void runBenchmark(int depth) {
         ChessBoard board = {0};
         parseFEN(&board, token);
 
-        for (size_t i = 0; i < depth; i++) token = strtok(NULL, ",");
+        for (int i = 0; i < depth; i++) token = strtok(NULL, ",");
         uint64_t expectedNodes = strtoull(token, NULL, 10);
 
         // Should consider switching clock() to something more precise since measurements are essentially discrete
