@@ -1,8 +1,11 @@
+#include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include "chess_board.h"
 #include "utility.h"
 #include "move_generator.h"
+
+Bitboard fullLine[SQUARES][SQUARES];
 
 // Bit representation: 1s represent the castling rights to stay on, 0s represent the castling rights to turn off
 static const CastlingRights CASTLING_RIGHTS_MASK[SQUARES] = {
@@ -15,6 +18,33 @@ static const CastlingRights CASTLING_RIGHTS_MASK[SQUARES] = {
     [A7] = ALL_RIGHTS,                    [B7] = ALL_RIGHTS, [C7] = ALL_RIGHTS, [D7] = ALL_RIGHTS, [E7] = ALL_RIGHTS,   [F7] = ALL_RIGHTS, [G7] = ALL_RIGHTS, [H7] = ALL_RIGHTS,
     [A8] = BLACK_KINGSIDE | WHITE_RIGHTS, [B8] = ALL_RIGHTS, [C8] = ALL_RIGHTS, [D8] = ALL_RIGHTS, [E8] = WHITE_RIGHTS, [F8] = ALL_RIGHTS, [G8] = ALL_RIGHTS, [H8] = BLACK_QUEENSIDE | WHITE_RIGHTS,
 };
+
+void initializeChessBoard() {
+    for (Square sq1 = 0; sq1 < SQUARES; sq1++) {
+        int rank1 = squareToRank(sq1);
+        int file1 = squareToFile(sq1);
+        Bitboard rankBB = rankBitboardOfSquare(sq1);
+        Bitboard fileBB = fileBitboardOfSquare(sq1);
+        Bitboard sq1BB = squareToBitboard(sq1);
+        Bitboard sq1BishopAttacks = getSlidingAttacks(0, sq1, BISHOP_INDEX);
+        
+        for (Square sq2 = sq1 + 1; sq2 < SQUARES; sq2++) {
+            int rankDistance = abs((int) squareToRank(sq2) - rank1);
+            int fileDistance = abs((int) squareToFile(sq2) - file1);
+            Bitboard line = 0;
+            if (rankDistance == 0) {
+                line = rankBB;
+            } else if (fileDistance == 0) {
+                line = fileBB;
+            } else if (rankDistance == fileDistance) {
+                line = (sq1BishopAttacks & getSlidingAttacks(0, sq2, BISHOP_INDEX))
+                      | sq1BB | squareToBitboard(sq2);  
+            }
+            fullLine[sq1][sq2] = line;
+            fullLine[sq2][sq1] = line;
+        }
+    }
+}
 
 void parseFEN(ChessBoard *board, const char *fenString) {
     static const Colour CHAR_TO_COLOUR[128] = {
@@ -152,6 +182,21 @@ void undoMove(ChessBoard *board, const Move *move, const IrreversibleBoardState 
         movePiece(board, stm, ROOK, rookToSquare, rookFromSquare);
     } 
 }
+
+/*bool isLegalMove(const ChessBoard *board, const Move *move) {
+    Square fromSquare = getFromSquare(move);
+    Square toSquare = getToSquare(move);
+    MoveType moveType = getMoveType(move);
+    Colour stm = board->sideToMove;
+
+    if (moveType == EN_PASSANT_CAPTURE) {
+        //fullLine[fromSquare][ksq]
+    }
+
+    if (board->pinned & squareToBitboard(fromSquare)) {
+        return fullLine[fromSquare][toSquare] & board->pieces[stm][KING];
+    }
+}*/
 
 bool isSquareAttacked(const ChessBoard *board, Square sq, Colour attackedSide) {
     Colour enemy = attackedSide ^ 1;
