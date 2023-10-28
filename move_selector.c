@@ -4,12 +4,15 @@
 #include "utility.h"
 
 Move* createMoveList(const ChessBoard *board, Move *moveList) {
-    Square kingSq = getKingSquare(board, board->sideToMove);
-    Bitboard checkers = isSquareAttacked(board, kingSq, board->sideToMove);
+    Colour stm = board->sideToMove;
+    Square kingSq = getKingSquare(board, stm);
+    Bitboard checkers = isSquareAttacked(board, kingSq, stm);
     if (!checkers) {
-        return generateAllMoves(board, moveList, ENTIRE_BOARD);
+        Bitboard validSquares = ENTIRE_BOARD & ~getPieces(board, stm, ALL_PIECES);
+        return generateAllMoves(board, moveList, validSquares);
     } else if (populationCount(checkers) == 1) {
-        return generateAllMoves(board, moveList, inBetweenLine[kingSq][bitboardToSquare(checkers)] | checkers);
+        Bitboard validSquares = (inBetweenLine[kingSq][bitboardToSquare(checkers)] | checkers) & ~getPieces(board, stm, ALL_PIECES);
+        return generateAllMoves(board, moveList, validSquares);
     } else {
         return generateKingMoves(board, moveList);
     }
