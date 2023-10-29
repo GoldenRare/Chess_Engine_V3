@@ -6,6 +6,7 @@
 #include "move_generator.h"
 
 Bitboard fullLine[SQUARES][SQUARES];
+Bitboard inBetweenLine[SQUARES][SQUARES];
 
 // Bit representation: 1s represent the castling rights to stay on, 0s represent the castling rights to turn off
 static const CastlingRights CASTLING_RIGHTS_MASK[SQUARES] = {
@@ -21,27 +22,30 @@ static const CastlingRights CASTLING_RIGHTS_MASK[SQUARES] = {
 
 void initializeChessBoard() {
     for (Square sq1 = 0; sq1 < SQUARES; sq1++) {
-        int rank1 = squareToRank(sq1);
-        int file1 = squareToFile(sq1);
-        Bitboard rankBB = rankBitboardOfSquare(sq1);
-        Bitboard fileBB = fileBitboardOfSquare(sq1);
+        int sq1Rank = squareToRank(sq1);
+        int sq1File = squareToFile(sq1);
         Bitboard sq1BB = squareToBitboard(sq1);
         Bitboard sq1BishopAttacks = getSlidingAttacks(0, sq1, BISHOP_INDEX);
+        Bitboard rankBB = rankBitboardOfSquare(sq1);
+        Bitboard fileBB = fileBitboardOfSquare(sq1);
         
         for (Square sq2 = sq1 + 1; sq2 < SQUARES; sq2++) {
-            int rankDistance = abs((int) squareToRank(sq2) - rank1);
-            int fileDistance = abs((int) squareToFile(sq2) - file1);
+            Bitboard sq2BB = squareToBitboard(sq2);
+            int rankDistance = abs((int) squareToRank(sq2) - sq1Rank);
+            int fileDistance = abs((int) squareToFile(sq2) - sq1File);
             Bitboard line = 0;
-            if (rankDistance == 0) {
-                line = rankBB;
-            } else if (fileDistance == 0) {
-                line = fileBB;
+            Bitboard inBetween = 0;
+            if (rankDistance == 0 || fileDistance == 0) {
+                line = rankDistance == 0 ? rankBB : fileBB;
+                inBetween = (getSlidingAttacks(sq2BB, sq1, ROOK_INDEX) & getSlidingAttacks(sq1BB, sq2, ROOK_INDEX)) | sq1BB | sq2BB;
             } else if (rankDistance == fileDistance) {
-                line = (sq1BishopAttacks & getSlidingAttacks(0, sq2, BISHOP_INDEX))
-                      | sq1BB | squareToBitboard(sq2);  
+                line = (sq1BishopAttacks & getSlidingAttacks(0, sq2, BISHOP_INDEX)) | sq1BB | sq2BB;
+                inBetween = (getSlidingAttacks(sq2BB, sq1, BISHOP_INDEX) & getSlidingAttacks(sq1BB, sq2, BISHOP_INDEX)) | sq1BB | sq2BB;  
             }
             fullLine[sq1][sq2] = line;
             fullLine[sq2][sq1] = line;
+            inBetweenLine[sq1][sq2] = inBetween;
+            inBetweenLine[sq2][sq1] = inBetween;
         }
     }
 }
@@ -198,7 +202,7 @@ void undoMove(ChessBoard *board, const Move *move, const IrreversibleBoardState 
     }
 }*/
 
-bool isSquareAttacked(const ChessBoard *board, Square sq, Colour attackedSide) {
+Bitboard isSquareAttacked(const ChessBoard *board, Square sq, Colour attackedSide) {
     Colour enemy = attackedSide ^ 1;
     Bitboard occupied = getOccupiedSquares(board);
     Bitboard queens = getPieces(board, enemy, QUEEN);

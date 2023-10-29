@@ -10,7 +10,6 @@ typedef struct ChessBoard {
     Bitboard pieces[COLOURS][PIECE_TYPES];
     Square enPassant;
     CastlingRights castlingRights;
-    //Bitboard pinned;
 } ChessBoard;
 
 // Keeps track of the information that is lost when a move is made
@@ -22,6 +21,9 @@ typedef struct IrreversibleBoardState {
 
 // Indexing the same square will return 0. Example: fullLine[e4][e4] == 0
 extern Bitboard fullLine[SQUARES][SQUARES];
+
+// Includes the endpoints as well
+extern Bitboard inBetweenLine[SQUARES][SQUARES];
 
 inline Colour getSideToMove(const ChessBoard *board) {
     return board->sideToMove;
@@ -43,6 +45,10 @@ inline CastlingRights getCastlingRights(const ChessBoard *board) {
     return board->castlingRights;
 }
 
+inline Square getKingSquare(const ChessBoard *board, Colour c) {
+    return bitboardToSquare(getPieces(board, c, KING));
+}
+
 void initializeChessBoard();
 
 void parseFEN(ChessBoard *board, const char *fenString);
@@ -56,7 +62,7 @@ void makeMove(ChessBoard *board, const Move *move, IrreversibleBoardState *ibs);
 void undoMove(ChessBoard *board, const Move *move, const IrreversibleBoardState *ibs);
 bool isLegalMove(const ChessBoard *board, const Move *move);
 
-bool isSquareAttacked(const ChessBoard *board, Square sq, Colour attackedSide);
+Bitboard isSquareAttacked(const ChessBoard *board, Square sq, Colour attackedSide);
 
 void printBitboard(Bitboard b);
 
