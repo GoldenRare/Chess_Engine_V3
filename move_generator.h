@@ -51,10 +51,10 @@ Bitboard generateKnightAttacks(Bitboard knightSq);
 Bitboard generateSlidingAttacks(const Direction directions[], size_t numDirections, Square sq, Bitboard occupied);
 Bitboard generateKingAttacks(Bitboard kingSq);
 
-Move* generateAllMoves(const ChessBoard *board, Move *moveList);
-Move* generatePawnMoves(const ChessBoard *board, Move *moveList);
-Move* generateKnightMoves(const ChessBoard *board, Move *moveList);
-Move* generateSlidingMoves(const ChessBoard *board, Move *moveList, PieceType pt, MagicIndex slidingIndex);
+Move* generateAllMoves(const ChessBoard *board, Move *moveList, Bitboard validSquares);
+Move* generatePawnMoves(const ChessBoard *board, Move *moveList, Bitboard validSquares);
+Move* generateKnightMoves(const ChessBoard *board, Move *moveList, Bitboard validSquares);
+Move* generateSlidingMoves(const ChessBoard *board, Move *moveList, Bitboard validSquares, PieceType pt, MagicIndex slidingIndex);
 Move* generateKingMoves(const ChessBoard *board, Move *moveList);
 
 /* Essentially checks if fromSq and toSq are within a king ring distance from each other. */
