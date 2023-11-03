@@ -3,7 +3,6 @@
 #include <string.h>
 #include <stdlib.h>
 #include <time.h>
-#include <inttypes.h>
 #include "benchmark.h"
 #include "chess_board.h"
 #include "move_generator.h"
@@ -39,11 +38,11 @@ void runBenchmark(int depth) {
         totalNodes += nodes;
         
         if (expectedNodes == nodes) correct++;
-        printf("info depth %d time %.0lf nodes %" PRIu64 " nps %.0lf\n", depth, time * 1000.0, nodes, nps);
+        printf("info depth %d time %.0lf nodes %llu nps %.0lf\n", depth, time * 1000.0, nodes, nps);
     }
     double nps = totalTime > 0.0 ? totalNodes / totalTime : totalNodes / 0.001;
     printf("Result: %d/%d\n", correct, totalPositions);
-    printf("Overall: info depth %d time %.0lf nodes %" PRIu64 " nps %.0lf\n", depth, totalTime * 1000, totalNodes, nps);
+    printf("Overall: info depth %d time %.0lf nodes %llu nps %.0lf\n", depth, totalTime * 1000, totalNodes, nps);
     fclose(perftFile);
 }
 
@@ -51,19 +50,15 @@ uint64_t perft(ChessBoard *board, int depth) {
     if (depth == 0) return 1ULL;
 
     uint64_t nodes = 0;
+    IrreversibleBoardState ibs;
     Move moveList[256];
-    Move *startList = moveList;
-    Move *endList = generateAllMoves(board, startList);
-    while (startList < endList) {
-        IrreversibleBoardState ibs;
-        Colour stm = board->sideToMove;
-        makeMove(board, startList, &ibs);
-        if (!isSquareAttacked(board, bitboardToSquare(getPieces(board, stm, KING)), stm)) {
-            nodes += perft(board, depth - 1);
-        }
-        undoMove(board, startList, &ibs);
-        startList++;
+    Move *endList = createMoveList(board, moveList);
+    Bitboard pinnedPieces = getPinnedPieces(board);
+    for (Move *move = moveList; move != endList; move++) {
+        if (!isLegalMove(board, move, pinnedPieces)) continue;
+        makeMove(board, move, &ibs);
+        nodes += perft(board, depth - 1);
+        undoMove(board, move, &ibs);
     }
-
     return nodes;
 }
