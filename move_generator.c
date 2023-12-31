@@ -243,44 +243,6 @@ Move* generateKingMoves(const ChessBoard *board, Move *moveList) {
     return moveList;
 }
 
-/*Move* generateCastleMoves(const ChessBoard *board, Move *moveList) {
-    Colour stm = getSideToMove(board);
-    Square kingSq = getKingSquare(board, stm);
-    Bitboard occupied = getOccupiedSquares(board);
-
-    CastlingRights stmRights = stm ? BLACK_RIGHTS : WHITE_RIGHTS;
-    stmRights &= getCastlingRights(board);
-    Square knightSquare = stm ? G8 : G1;
-    if ((KINGSIDE & stmRights) && isPathClear(moveSquareInDirection(kingSq, EAST), knightSquare, occupied)) {
-        setMove(moveList++, kingSq, knightSquare, KINGSIDE_CASTLE);
-    }
-
-    knightSquare = stm ? B8 : B1;
-    if ((QUEENSIDE & stmRights) && isPathClear(moveSquareInDirection(kingSq, WEST), knightSquare, occupied)) {
-        setMove(moveList++, kingSq, moveSquareInDirection(knightSquare, EAST), QUEENSIDE_CASTLE);
-    }
-    return moveList;
-}*/
-
-/*Move* generateCastleMoves(const ChessBoard *board, Move *moveList) {
-    Colour stm = getSideToMove(board);
-    Square kingSq = getKingSquare(board, stm);
-    Bitboard occupied = getOccupiedSquares(board);
-
-    CastlingRights stmRights = stm ? BLACK_RIGHTS : WHITE_RIGHTS;
-    stmRights &= getCastlingRights(board);
-    const Square knightSquare[2][COLOURS] = {{G1, G8}, {B1, B8}};
-    const Square castlePathStartSquare[2][COLOURS] = {{F1, F8}, {D1, D8}};
-    if ((KINGSIDE & stmRights) && isPathClear(castlePathStartSquare[0][stm], knightSquare[0][stm], occupied)) {
-        setMove(moveList++, kingSq, knightSquare[0][stm], KINGSIDE_CASTLE);
-    }
-
-    if ((QUEENSIDE & stmRights) && isPathClear(castlePathStartSquare[1][stm], knightSquare[1][stm], occupied)) {
-        setMove(moveList++, kingSq, moveSquareInDirection(knightSquare[1][stm], EAST), QUEENSIDE_CASTLE);
-    }
-    return moveList;
-}*/
-
 Move* generateCastleMoves(const ChessBoard *board, Move *moveList) {
     Colour stm = getSideToMove(board);
     Square kingSq = getKingSquare(board, stm);
