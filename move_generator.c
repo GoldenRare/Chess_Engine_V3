@@ -87,6 +87,23 @@ bool isDirectionMaintained(Square fromSq, Square toSq) {
     return max(rankDistance, fileDistance) == 1;
 }
 
+Move* createMoveList(const ChessBoard *board, Move *moveList) {
+    Colour stm = board->sideToMove;
+    Square kingSq = getKingSquare(board, stm);
+    Bitboard occupied = getOccupiedSquares(board);
+    Bitboard checkers = attackersTo(board, kingSq, stm, occupied);
+    if (!checkers) {
+        Bitboard validSquares = ENTIRE_BOARD & ~getPieces(board, stm, ALL_PIECES);
+        moveList = generateAllMoves(board, moveList, validSquares);
+        return generateCastleMoves(board, moveList);
+    } else if (populationCount(checkers) == 1) {
+        Bitboard validSquares = (inBetweenLine[kingSq][bitboardToSquare(checkers)] | checkers) & ~getPieces(board, stm, ALL_PIECES);
+        return generateAllMoves(board, moveList, validSquares);
+    } else {
+        return generateKingMoves(board, moveList);
+    }
+}
+
 Move* generateAllMoves(const ChessBoard *board, Move *moveList, Bitboard validSquares) {
     moveList = generatePawnMoves(board, moveList, validSquares);
     moveList = generateKnightMoves(board, moveList, validSquares);
@@ -150,7 +167,7 @@ Move* generatePawnMoves(const ChessBoard *board, Move *moveList, Bitboard validS
             }
         }
     }
-    
+
     while (pawnsNotOn7thRank) {
         Square fromSq = bitboardToSquareWithReset(&pawnsNotOn7thRank);
         Bitboard captures = getPawnAttacks(stm, fromSq) & enemyPieces & validSquares;
@@ -213,7 +230,7 @@ Move* generateSlidingMoves(const ChessBoard *board, Move *moveList, Bitboard val
 
 Move* generateKingMoves(const ChessBoard *board, Move *moveList) {
     Colour stm = getSideToMove(board);
-    Square fromSq = bitboardToSquare(getPieces(board, stm, KING));
+    Square fromSq = getKingSquare(board, stm);
     Bitboard stmPieces = getPieces(board, stm, ALL_PIECES);
     Bitboard enemyPieces = getPieces(board, stm ^ 1, ALL_PIECES);
 
@@ -223,32 +240,64 @@ Move* generateKingMoves(const ChessBoard *board, Move *moveList) {
     while (captures) setMove(moveList++, fromSq, bitboardToSquareWithReset(&captures), CAPTURE);
     while (quiets) setMove(moveList++, fromSq, bitboardToSquareWithReset(&quiets), QUIET);
 
-    Bitboard occupied = stmPieces | enemyPieces;
-    CastlingRights kingSide = stm ? BLACK_KINGSIDE & getCastlingRights(board)
-                                  : WHITE_KINGSIDE & getCastlingRights(board);
-    CastlingRights queenSide = stm ? BLACK_QUEENSIDE & getCastlingRights(board)
-                                   : WHITE_QUEENSIDE & getCastlingRights(board);
-    if (kingSide) {
-        Square sq = fromSq;
-        size_t i;
-        for (i = 0; i < 2; i++) {
-            sq = moveSquareInDirection(sq, EAST);
-            if (occupied & squareToBitboard(sq)) break;
-            if (isSquareAttacked(board, sq, stm)) break;
-        }
-        if (i == 2 && !isSquareAttacked(board, fromSq, stm)) setMove(moveList++, fromSq, sq, KINGSIDE_CASTLE); 
+    return moveList;
+}
+
+/*Move* generateCastleMoves(const ChessBoard *board, Move *moveList) {
+    Colour stm = getSideToMove(board);
+    Square kingSq = getKingSquare(board, stm);
+    Bitboard occupied = getOccupiedSquares(board);
+
+    CastlingRights stmRights = stm ? BLACK_RIGHTS : WHITE_RIGHTS;
+    stmRights &= getCastlingRights(board);
+    Square knightSquare = stm ? G8 : G1;
+    if ((KINGSIDE & stmRights) && isPathClear(moveSquareInDirection(kingSq, EAST), knightSquare, occupied)) {
+        setMove(moveList++, kingSq, knightSquare, KINGSIDE_CASTLE);
     }
 
-    if (queenSide) {
-        Square sq = fromSq;
-        size_t i;
-        for (i = 0; i < 3; i++) {
-            sq = moveSquareInDirection(sq, WEST);
-            if (occupied & squareToBitboard(sq)) break;
-            if (i != 2 && isSquareAttacked(board, sq, stm)) break;
-        }
-        if (i == 3 && !isSquareAttacked(board, fromSq, stm)) setMove(moveList++, fromSq, moveSquareInDirection(sq, EAST), QUEENSIDE_CASTLE); 
+    knightSquare = stm ? B8 : B1;
+    if ((QUEENSIDE & stmRights) && isPathClear(moveSquareInDirection(kingSq, WEST), knightSquare, occupied)) {
+        setMove(moveList++, kingSq, moveSquareInDirection(knightSquare, EAST), QUEENSIDE_CASTLE);
+    }
+    return moveList;
+}*/
+
+/*Move* generateCastleMoves(const ChessBoard *board, Move *moveList) {
+    Colour stm = getSideToMove(board);
+    Square kingSq = getKingSquare(board, stm);
+    Bitboard occupied = getOccupiedSquares(board);
+
+    CastlingRights stmRights = stm ? BLACK_RIGHTS : WHITE_RIGHTS;
+    stmRights &= getCastlingRights(board);
+    const Square knightSquare[2][COLOURS] = {{G1, G8}, {B1, B8}};
+    const Square castlePathStartSquare[2][COLOURS] = {{F1, F8}, {D1, D8}};
+    if ((KINGSIDE & stmRights) && isPathClear(castlePathStartSquare[0][stm], knightSquare[0][stm], occupied)) {
+        setMove(moveList++, kingSq, knightSquare[0][stm], KINGSIDE_CASTLE);
     }
 
+    if ((QUEENSIDE & stmRights) && isPathClear(castlePathStartSquare[1][stm], knightSquare[1][stm], occupied)) {
+        setMove(moveList++, kingSq, moveSquareInDirection(knightSquare[1][stm], EAST), QUEENSIDE_CASTLE);
+    }
+    return moveList;
+}*/
+
+Move* generateCastleMoves(const ChessBoard *board, Move *moveList) {
+    Colour stm = getSideToMove(board);
+    Square kingSq = getKingSquare(board, stm);
+    Bitboard occupied = getOccupiedSquares(board);
+
+    CastlingRights stmRights = stm ? BLACK_RIGHTS : WHITE_RIGHTS;
+    stmRights &= getCastlingRights(board);
+    const Square knightSquare[CASTLING_SIDES][COLOURS] = {{G1, G8}, {B1, B8}};
+    const Square castlePathStartSquare[CASTLING_SIDES][COLOURS] = {{F1, F8}, {D1, D8}};
+    const Square toSquare[CASTLING_SIDES][COLOURS] = {{G1, G8}, {C1, C8}};
+    const CastlingRights cr[CASTLING_SIDES] = {KINGSIDE, QUEENSIDE};
+    if (stmRights) { 
+        for (size_t i = 0; i < CASTLING_SIDES; i++) { // First kingside, then queenside.
+            if ((cr[i] & stmRights) && isPathClear(castlePathStartSquare[i][stm], knightSquare[i][stm], occupied)) {
+                setMove(moveList++, kingSq, toSquare[i][stm], i + 2); // +2 == offset to convert to MoveType == KINGSIDE_CASTLE/QUEENSIDE_CASTLE
+            }
+        }
+    }
     return moveList;
 }
