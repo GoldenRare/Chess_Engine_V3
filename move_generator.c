@@ -81,12 +81,6 @@ Bitboard generateKingAttacks(Bitboard kingSq) {
     return attacks | shiftBitboard(kingSq, NORTH) | shiftBitboard(kingSq, SOUTH);
 }
 
-bool isDirectionMaintained(Square fromSq, Square toSq) {
-    int rankDistance = abs((int) squareToRank(toSq) - (int) squareToRank(fromSq));
-    int fileDistance = abs((int) squareToFile(toSq) - (int) squareToFile(fromSq));
-    return max(rankDistance, fileDistance) == 1;
-}
-
 Move* createMoveList(const ChessBoard *board, Move *moveList) {
     Colour stm = board->sideToMove;
     Square kingSq = getKingSquare(board, stm);
@@ -221,4 +215,10 @@ Move* generateCastleMoves(const ChessBoard *board, Move *moveList) {
         }
     }
     return moveList;
+}
+
+bool isDirectionMaintained(Square fromSq, Square toSq) {
+    int rankDistance = abs((int) squareToRank(toSq) - (int) squareToRank(fromSq));
+    int fileDistance = abs((int) squareToFile(toSq) - (int) squareToFile(fromSq));
+    return max(rankDistance, fileDistance) == 1;
 }
