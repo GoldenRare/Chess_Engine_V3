@@ -43,6 +43,14 @@ inline Bitboard getSlidingAttacks(Bitboard occupied, Square sq, MagicIndex index
     return slidingAttacks[magic->offset + pext(occupied, magic->mask)];
 }
 
+inline Bitboard getAttacks(PieceType pt, Bitboard occupied, Square sq) {
+    return pt == KNIGHT ? getNonSlidingAttacks(KNIGHT_ATTACKER, sq) 
+         : pt == BISHOP ? getSlidingAttacks(occupied, sq, BISHOP_INDEX)
+         : pt == ROOK   ? getSlidingAttacks(occupied, sq, ROOK_INDEX)  
+         : pt == QUEEN  ? getSlidingAttacks(occupied, sq, BISHOP_INDEX) | getSlidingAttacks(occupied, sq, ROOK_INDEX)
+         :                getNonSlidingAttacks(KING_ATTACKER, sq);
+}
+
 void initializeMoveGenerator();
 void initializeNonSlidingAttacks();
 void initializeSlidingAttacks();
@@ -51,11 +59,11 @@ Bitboard generateKnightAttacks(Bitboard knightSq);
 Bitboard generateSlidingAttacks(const Direction directions[], size_t numDirections, Square sq, Bitboard occupied);
 Bitboard generateKingAttacks(Bitboard kingSq);
 
+Move* createMoveList(const ChessBoard *board, Move *moveList);
 Move* generateAllMoves(const ChessBoard *board, Move *moveList, Bitboard validSquares);
 Move* generatePawnMoves(const ChessBoard *board, Move *moveList, Bitboard validSquares);
-Move* generateKnightMoves(const ChessBoard *board, Move *moveList, Bitboard validSquares);
-Move* generateSlidingMoves(const ChessBoard *board, Move *moveList, Bitboard validSquares, PieceType pt, MagicIndex slidingIndex);
-Move* generateKingMoves(const ChessBoard *board, Move *moveList);
+Move* generateNonPawnMoves(const ChessBoard *board, Move *moveList, Bitboard validSquares, PieceType pt);
+Move* generateCastleMoves(const ChessBoard *board, Move *moveList);
 
 /* Essentially checks if fromSq and toSq are within a king ring distance from each other. */
 bool isDirectionMaintained(Square fromSq, Square toSq); 
