@@ -1,6 +1,7 @@
 #ifndef UTILITY_H
 #define UTILITY_H
 
+#define A8_BB 0x8000000000000000ULL
 #define ENTIRE_BOARD 0xFFFFFFFFFFFFFFFFULL
 
 #define RANK_1_BB 0x00000000000000FFULL
@@ -81,7 +82,8 @@ enum CastlingRights {
     BLACK_RIGHTS = BLACK_KINGSIDE | BLACK_QUEENSIDE,
     KINGSIDE  = WHITE_KINGSIDE  | BLACK_KINGSIDE,
     QUEENSIDE = WHITE_QUEENSIDE | BLACK_QUEENSIDE,
-    ALL_RIGHTS = WHITE_RIGHTS | BLACK_RIGHTS
+    ALL_RIGHTS = WHITE_RIGHTS | BLACK_RIGHTS,
+    CASTLING_SIDES = 2
 };
 typedef enum CastlingRights CastlingRights;
 
@@ -98,11 +100,11 @@ inline Bitboard rankBitboardOfSquare(Square sq) {
 }
 
 inline Bitboard fileBitboardOfSquare(Square sq) {
-    return FILE_A_BB >> squareToFile(sq) * -EAST;
+    return FILE_A_BB >> squareToFile(sq);
 }
 
 inline Bitboard squareToBitboard(Square sq) {
-    return 0x8000000000000000ULL >> sq;
+    return A8_BB >> sq;
 }
 
 inline Square moveSquareInDirection(Square sq, Direction d) {
@@ -115,7 +117,7 @@ inline Bitboard shiftBitboard(Bitboard b, Direction d) {
 
 /* If multiple bits are set, returns square of Least Significant Bit. Undefined for b == 0. */
 inline Square bitboardToSquare(Bitboard b) {
-    return H1 - __builtin_ctzll(b); // Should also test bit scan reverse to see if faster than doing (H1 - x);
+    return H1 - __builtin_ctzll(b);
 }
 
 /* If multiple bits are set, returns square of Least Significant Bit and removes the LSB from pointer. Undefined for b == 0. */
