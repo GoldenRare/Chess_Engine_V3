@@ -30,7 +30,8 @@ typedef uint64_t Bitboard;
 typedef uint16_t Move;
 
 enum PieceType {
-    PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING, ALL_PIECES, PIECE_TYPES, NO_PIECE
+    PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING, ALL_PIECES, PIECE_TYPES, NO_PIECE,
+    COLOUR_OFFSET = 6
 };
 typedef enum PieceType PieceType;
 
