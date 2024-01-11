@@ -27,6 +27,7 @@
 #include <immintrin.h>
 
 typedef uint64_t Bitboard;
+typedef uint64_t Key;
 typedef uint16_t Move;
 
 enum PieceType {
