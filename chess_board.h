@@ -5,15 +5,17 @@
 #include "utility.h"
 
 typedef struct ChessBoard {
-    Colour sideToMove;
-    PieceType pieceTypes[SQUARES];
     Bitboard pieces[COLOURS][PIECE_TYPES];
+    Key positionKey;
+    PieceType pieceTypes[SQUARES];
+    Colour sideToMove;
     Square enPassant;
     CastlingRights castlingRights;
 } ChessBoard;
 
 // Keeps track of the information that is lost when a move is made
 typedef struct IrreversibleBoardState {
+    Key positionKey;
     PieceType capturedPiece;
     Square enPassant;
     CastlingRights castlingRights;
@@ -49,6 +51,10 @@ inline Square getKingSquare(const ChessBoard *board, Colour c) {
     return bitboardToSquare(getPieces(board, c, KING));
 }
 
+inline bool isPathClear(Square from, Square to, Bitboard occupied) {
+    return !(inBetweenLine[from][to] & occupied);
+}
+
 void initializeChessBoard();
 
 void parseFEN(ChessBoard *board, const char *fenString);
@@ -60,9 +66,10 @@ void movePiece(ChessBoard *board, Colour c, PieceType pt, Square fromSquare, Squ
 void removePiece(ChessBoard *board, Colour c, PieceType pt, Square sq);
 void makeMove(ChessBoard *board, const Move *move, IrreversibleBoardState *ibs);
 void undoMove(ChessBoard *board, const Move *move, const IrreversibleBoardState *ibs);
-bool isLegalMove(const ChessBoard *board, const Move *move);
+bool isLegalMove(const ChessBoard *board, const Move *move, Bitboard pinned);
 
-Bitboard isSquareAttacked(const ChessBoard *board, Square sq, Colour attackedSide);
+Bitboard getPinnedPieces(const ChessBoard *board);
+Bitboard attackersTo(const ChessBoard *board, Square sq, Colour attackedSide, Bitboard occupied);
 
 void printBitboard(Bitboard b);
 
