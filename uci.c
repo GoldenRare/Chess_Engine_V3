@@ -6,14 +6,16 @@
 #include "chess_board.h"
 #include "move_generator.h"
 #include "utility.h"
+#include "search.h"
 
 static const char *startPos = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
-static const char *quit = "quit";
-static const char *uci = "uci";
-static const char *isready = "isready";
+static const char *quit      = "quit";
+static const char *uci       = "uci";
+static const char *isready   = "isready";
 static const char *benchmark = "benchmark";
-static const char *position = "position";
+static const char *position  = "position";
+static const char *go        = "go";
 
 void uciLoop() {
     char input[256]; // TODO: Figure out max size
@@ -28,10 +30,11 @@ void uciLoop() {
         token = strtok(input, " ");
         if (token == NULL) continue;
 
-        if (strcmp(token, uci) == 0) processUCICommand();
-        else if (strcmp(token, isready) == 0) processIsReadyCommand();
+        if      (strcmp(token, uci)       == 0) processUCICommand();
+        else if (strcmp(token, isready)   == 0) processIsReadyCommand();
         else if (strcmp(token, benchmark) == 0) processBenchmarkCommand();
-        else if (strcmp(token, position) == 0) processPositionCommand(&board);
+        else if (strcmp(token, position)  == 0) processPositionCommand(&board);
+        else if (strcmp(token, go)        == 0) processGoCommand(&board);
 
         char *tokenHelper = token;
         while (tokenHelper != NULL) tokenHelper = strtok(NULL, " ");
@@ -108,4 +111,14 @@ void processMoves(ChessBoard *board) {
         IrreversibleBoardState ibs;
         makeMove(board, --move, &ibs);
     }
+}
+
+void processGoCommand(ChessBoard *board) {
+    static const char *depth = "depth";
+    int searchDepth = MAX_DEPTH;
+    
+    char *token = strtok(NULL, " ");
+    if (token != NULL && strcmp(depth, token) == 0) searchDepth = strtol(strtok(NULL, " "), NULL, 10);
+
+    startSearch(board, searchDepth);
 }
