@@ -18,11 +18,11 @@ static const char *position  = "position";
 static const char *go        = "go";
 
 void uciLoop() {
+    ChessBoard board;
     char input[256]; // TODO: Figure out max size
     char *token = "";
 
     while (!token || strcmp(token, quit)) {
-        ChessBoard board = {0};
         fgets(input, sizeof(input), stdin);
         size_t length = strlen(input);
         if (length && input[length - 1] == '\n') input[length - 1] = '\0';
@@ -64,6 +64,7 @@ void processPositionCommand(ChessBoard *board) {
     char positionToSet[128] = "";
     char *token = strtok(NULL, " ");
 
+    memset(board, 0, sizeof(ChessBoard)); // Should consider whether or not this should be handled by parseFEN
     if (strcmp(token, fen) == 0) {
         token = strtok(NULL, " ");
         while (token != NULL && strcmp(token, moves) != 0) {
