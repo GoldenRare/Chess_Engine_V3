@@ -27,6 +27,8 @@ extern Bitboard fullLine[SQUARES][SQUARES];
 // Includes the endpoints as well
 extern Bitboard inBetweenLine[SQUARES][SQUARES];
 
+extern const char *SQUARE_NAME[];
+
 inline Colour getSideToMove(const ChessBoard *board) {
     return board->sideToMove;
 }
