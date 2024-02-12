@@ -89,6 +89,11 @@ enum CastlingRights {
 };
 typedef enum CastlingRights CastlingRights;
 
+enum Value {
+    CHECKMATED = -32000, DRAW = 0, INFINITE = 32700 // Temporary
+};
+typedef enum Value Value;
+
 inline Rank squareToRank(Square sq) {
     return RANK_8 - (sq >> 3);
 }
