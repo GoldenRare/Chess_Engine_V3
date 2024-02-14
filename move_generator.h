@@ -3,6 +3,7 @@
 
 #define NUMBER_OF_SLIDING_DIRECTIONS 4
 #define MAX_SLIDING_ATTACKS 107648
+#define MAX_MOVES 256
 
 #include <stdbool.h>
 #include <stdint.h>
