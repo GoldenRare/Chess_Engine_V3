@@ -163,4 +163,13 @@ inline int max(int a, int b) {
     return a >= b ? a : b;
 }
 
+inline void encodeChessMove(char *destination, const char *fromSquare, const char *toSquare, const char promotionPiece) {
+    destination[0] = fromSquare[0];
+    destination[1] = fromSquare[1];
+    destination[2] = toSquare[0];
+    destination[3] = toSquare[1];
+    destination[4] = promotionPiece; // This will most often be the null character if the move is no promotion
+    destination[5] = '\0';
+}
+
 #endif

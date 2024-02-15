@@ -85,19 +85,16 @@ void processPositionCommand(ChessBoard *board) {
 //position fen 7k/5P2/8/8/8/8/8/7K w - - 0 1 moves f7f8q h8h7 f8b4 h7g7 h1g2 g7f6 b4d2
 //position fen 4q2k/5P2/8/8/8/8/8/7K w - - 0 1 moves f7e8q h8g7
 void processMoves(ChessBoard *board) {
-    static const char *PROMOTION_NAME[] = {"n", "b", "r", "q"};
     char *moveStr;
     while ((moveStr = strtok(NULL, " ")) != NULL) {
-        Move moveList[256];
+        Move moveList[MAX_MOVES];
         Move *move;
         char moveToName[6] = "";
         createMoveList(board, moveList);
         for (move = moveList; strcmp(moveStr, moveToName) != 0; move++) {
-            moveToName[0] = '\0';
-            strcat(moveToName, SQUARE_NAME[getFromSquare(move)]); // Consider a different concat operation like snprinf()
-            strcat(moveToName, SQUARE_NAME[getToSquare  (move)]);
             MoveType moveType = getMoveType(move);
-            if (moveType & PROMOTION) strcat(moveToName, PROMOTION_NAME[moveType & PROMOTION_PIECE_OFFSET_MASK]);
+            char promotionPiece = moveType & PROMOTION ? PROMOTION_NAME[moveType & PROMOTION_PIECE_OFFSET_MASK] : '\0';
+            encodeChessMove(moveToName, SQUARE_NAME[getFromSquare(move)], SQUARE_NAME[getToSquare(move)], promotionPiece);
         }
         IrreversibleBoardState ibs;
         makeMove(board, --move, &ibs);
