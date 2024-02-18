@@ -12,5 +12,7 @@ void processBenchmarkCommand();
 void processPositionCommand(ChessBoard *board);
 void processMoves(ChessBoard *board);
 void processGoCommand(ChessBoard *board);
+void processSetOptionCommand();
+void processHashOption();
 
 #endif

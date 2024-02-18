@@ -7,6 +7,7 @@
 #include "move_generator.h"
 #include "utility.h"
 #include "search.h"
+#include "transposition_table.h"
 
 static const char *startPos = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
@@ -16,6 +17,7 @@ static const char *isready   = "isready";
 static const char *benchmark = "benchmark";
 static const char *position  = "position";
 static const char *go        = "go";
+static const char *setoption = "setoption";
 
 void uciLoop() {
     ChessBoard board;
@@ -35,6 +37,7 @@ void uciLoop() {
         else if (strcmp(token, benchmark) == 0) processBenchmarkCommand();
         else if (strcmp(token, position)  == 0) processPositionCommand(&board);
         else if (strcmp(token, go)        == 0) processGoCommand(&board);
+        else if (strcmp(token, setoption) == 0) processSetOptionCommand();
 
         char *tokenHelper = token;
         while (tokenHelper != NULL) tokenHelper = strtok(NULL, " ");
@@ -109,4 +112,19 @@ void processGoCommand(ChessBoard *board) {
     if (token != NULL && strcmp(depth, token) == 0) searchDepth = strtol(strtok(NULL, " "), NULL, 10);
 
     startSearch(board, searchDepth);
+}
+
+void processSetOptionCommand() {
+    static const char *Hash = "Hash";
+    
+    strtok(NULL, " "); // Discard since this should just be "name"
+    char *token = strtok(NULL, " ");
+
+    if (strcmp(token, Hash) == 0) processHashOption();
+
+}
+
+void processHashOption() {
+    strtok(NULL, " "); // Discard value string
+    setTranspositionTableSize(strtol(strtok(NULL, " "), NULL, 10));
 }
