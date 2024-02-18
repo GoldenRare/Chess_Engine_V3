@@ -122,6 +122,11 @@ inline Bitboard shiftBitboard(Bitboard b, Direction d) {
     return d > 0 ? b << d : b >> -d;
 }
 
+/* If multiple bits are set, returns square of Most Significant Bit. Undefined for b == 0. */
+inline Square bitboardToSquareMSB(Bitboard b) {
+    return __builtin_clzll(b);
+}
+
 /* If multiple bits are set, returns square of Least Significant Bit. Undefined for b == 0. */
 inline Square bitboardToSquare(Bitboard b) {
     return H1 - __builtin_ctzll(b);
