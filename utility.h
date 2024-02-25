@@ -22,6 +22,8 @@
 #define FILE_G_BB 0x0202020202020202ULL
 #define FILE_H_BB 0x0101010101010101ULL
 
+#define NO_MOVE 0
+
 #include <stdint.h>
 #include <stdbool.h>
 #include <immintrin.h>
@@ -93,6 +95,11 @@ enum Value {
     CHECKMATED = -32000, DRAW = 0, INFINITE = 32700 // Temporary
 };
 typedef enum Value Value;
+
+enum Bound {
+    UPPER, LOWER, EXACT
+};
+typedef enum Bound Bound;
 
 inline Rank squareToRank(Square sq) {
     return RANK_8 - (sq >> 3);
