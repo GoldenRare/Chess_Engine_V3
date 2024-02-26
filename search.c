@@ -7,6 +7,7 @@
 #include "move_generator.h"
 #include "evaluation.h"
 #include "transposition_table.h"
+#include "move_sorter.h"
 
 void startSearch(ChessBoard *board, int depth) {
     int bestScore = -INFINITE;
@@ -44,7 +45,9 @@ int alphaBeta(ChessBoard *board, int alpha, int beta, int depth) {
     /* Transposition Table */
     bool hasEvaluation;
     PositionEvaluation *pe = probeTranspositionTable(board->positionKey, &hasEvaluation);
+    Move ttMove = NO_MOVE;
     if (hasEvaluation) {
+        ttMove = pe->bestMove;
         Bound bound = getBound(pe);
         int nodeScore = pe->nodeScore;
         if (pe->depth >= depth) {
@@ -64,6 +67,7 @@ int alphaBeta(ChessBoard *board, int alpha, int beta, int depth) {
     IrreversibleBoardState ibs;
     Move moveList[256];
     Move *endList = createMoveList(board, moveList);
+    sortMoves(moveList, endList, ttMove);
     Bitboard pinnedPieces = getPinnedPieces(board);
 
     int bestScore = -INFINITE;
