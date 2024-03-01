@@ -10,34 +10,25 @@
 #include "move_sorter.h"
 
 void startSearch(ChessBoard *board, int depth) {
-    int bestScore = -INFINITE;
-    Move *bestMove = NULL;
-    
-    clock_t start = clock();
-    IrreversibleBoardState ibs;
-    Move moveList[256];
-    Move *endList = createMoveList(board, moveList);
-    Bitboard pinnedPieces = getPinnedPieces(board);
-    for (Move *move = moveList; move != endList; move++) {
-        if (!isLegalMove(board, move, pinnedPieces)) continue;
-        makeMove(board, move, &ibs);
-        int score = -alphaBeta(board, -INFINITE, -bestScore, depth - 1);
-        if (score > bestScore) {
-            bestScore = score;
-            bestMove = move;
-        } 
-        undoMove(board, move, &ibs);
-    }
-    clock_t end = clock();
-    double totalTime = (double) (end - start) / CLOCKS_PER_SEC;
-
     char moveStr[6];
-    MoveType moveType = getMoveType(bestMove);
-    char promotionPiece = moveType & PROMOTION ? PROMOTION_NAME[moveType & PROMOTION_PIECE_OFFSET_MASK] : '\0';
-    encodeChessMove(moveStr, SQUARE_NAME[getFromSquare(bestMove)], SQUARE_NAME[getToSquare(bestMove)], promotionPiece);
+    bool hasEvaluation;
+    PositionEvaluation *pe;
+    MoveType moveType;
+    char promotionPiece;
 
-    // Should eventually include seldepth, nodes, multipv?, score mate, nps, maybe others 
-    printf("info depth %d time %.0lf score cp %d pv %s\n", depth, totalTime * 1000.0, bestScore, moveStr);
+    double totalTime;
+    clock_t start = clock();
+    for (int d = 1; d <= depth; d++) { // TODO: Experiment with different steps for iterative deepening
+        int score = alphaBeta(board, -INFINITE, INFINITE, d);
+        totalTime = (double) (clock() - start) / CLOCKS_PER_SEC;
+
+        pe = probeTranspositionTable(board->positionKey, &hasEvaluation);
+        moveType = getMoveType(&pe->bestMove);
+        promotionPiece = moveType & PROMOTION ? PROMOTION_NAME[moveType & PROMOTION_PIECE_OFFSET_MASK] : '\0';
+        encodeChessMove(moveStr, SQUARE_NAME[getFromSquare(&pe->bestMove)], SQUARE_NAME[getToSquare(&pe->bestMove)], promotionPiece);
+        // TODO: Should eventually include seldepth, nodes, multipv?, score mate, nps, maybe others 
+        printf("info depth %d time %.0lf score cp %d pv %s\n", d, totalTime * 1000.0, score, moveStr);
+    }
     printf("bestmove %s\n", moveStr); // Should eventually include ponder
 }
 
