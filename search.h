@@ -3,6 +3,7 @@
 
 #define MAX_DEPTH 7
 
+#include <stdbool.h>
 #include "chess_board.h"
 #include "utility.h"
 
@@ -11,7 +12,7 @@ typedef struct SearchHelper {
 } SearchHelper;
 
 void startSearch(ChessBoard *board, int depth);
-int alphaBeta(ChessBoard *board, int alpha, int beta, int depth, SearchHelper *sh);
+int alphaBeta(ChessBoard *board, int alpha, int beta, int depth, SearchHelper *sh, bool isRootNode);
 void encodePrincipalVariation(char* buffer, const Move *pv);
 
 inline void updatePrincipalVariation(Move m, Move *currentPv, const Move *childrenPv) {
