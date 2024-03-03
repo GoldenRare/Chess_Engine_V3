@@ -1,8 +1,6 @@
 #ifndef UCI_H
 #define UCI_H
 
-#define MAX_DEPTH 7
-
 #include "chess_board.h"
 
 void uciLoop();
