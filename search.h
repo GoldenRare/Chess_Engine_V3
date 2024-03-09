@@ -13,6 +13,7 @@ typedef struct SearchHelper {
 
 void startSearch(ChessBoard *board, int depth);
 int alphaBeta(ChessBoard *board, int alpha, int beta, int depth, SearchHelper *sh, bool isRootNode);
+int quiescenceSearch(ChessBoard *board, int alpha, int beta);
 void encodePrincipalVariation(char* buffer, const Move *pv);
 
 inline void updatePrincipalVariation(Move m, Move *currentPv, const Move *childrenPv) {
