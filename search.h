@@ -1,7 +1,7 @@
 #ifndef SEARCH_H
 #define SEARCH_H
 
-#define MAX_DEPTH 7
+#define MAX_DEPTH 8
 
 #include <stdbool.h>
 #include "chess_board.h"
