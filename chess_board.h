@@ -5,8 +5,9 @@
 #include "utility.h"
 
 typedef struct ChessBoard {
-    Bitboard pieces[COLOURS][PIECE_TYPES];
     Key positionKey;
+    Bitboard checkers;
+    Bitboard pieces[COLOURS][PIECE_TYPES];
     PieceType pieceTypes[SQUARES];
     Colour sideToMove;
     Square enPassant;
@@ -16,6 +17,7 @@ typedef struct ChessBoard {
 // Keeps track of the information that is lost when a move is made
 typedef struct IrreversibleBoardState {
     Key positionKey;
+    Bitboard checkers;
     PieceType capturedPiece;
     Square enPassant;
     CastlingRights castlingRights;

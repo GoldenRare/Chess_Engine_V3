@@ -117,6 +117,9 @@ void parseFEN(ChessBoard *board, const char *fenString) {
     } else {
         board->enPassant = NO_SQUARE;
     }
+
+    /* 5) Miscellaneous Data */
+    board->checkers = attackersTo(board, getKingSquare(board, board->sideToMove), board->sideToMove, getOccupiedSquares(board));
 }
 
 void addPiece(ChessBoard *board, Colour c, PieceType pt, Square sq) {
@@ -147,6 +150,7 @@ void makeMove(ChessBoard *board, const Move *move, IrreversibleBoardState *ibs) 
     MoveType moveType = getMoveType(move);
     Colour stm = board->sideToMove;
     ibs->positionKey = board->positionKey;
+    ibs->checkers = board->checkers;
     
     if (moveType & CAPTURE) {
         Square captureSquare = moveType == EN_PASSANT_CAPTURE ? moveSquareInDirection(toSquare, stm ? NORTH : SOUTH) : toSquare;
@@ -190,6 +194,7 @@ void makeMove(ChessBoard *board, const Move *move, IrreversibleBoardState *ibs) 
     }
     board->sideToMove ^= 1;
     board->positionKey ^= zobristHashes.sideToMove;
+    board->checkers = attackersTo(board, getKingSquare(board, board->sideToMove), board->sideToMove, getOccupiedSquares(board));
 }
 
 void undoMove(ChessBoard *board, const Move *move, const IrreversibleBoardState *ibs) {
@@ -197,6 +202,7 @@ void undoMove(ChessBoard *board, const Move *move, const IrreversibleBoardState 
     board->sideToMove ^= 1;
     board->enPassant = ibs->enPassant;
     board->castlingRights = ibs->castlingRights;
+    board->checkers = ibs->checkers;
     
     Square fromSquare = getFromSquare(move);
     Square toSquare = getToSquare(move);
