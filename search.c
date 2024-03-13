@@ -89,8 +89,7 @@ int alphaBeta(ChessBoard *board, int alpha, int beta, int depth, SearchHelper *s
     /* Checkmate and Stalemate Detection */
     if (bestScore == -INFINITE) { // Something is always better than nothing, so bestScore stays -INFINITE if it couldn't play any move
         sh->pv[0] = NO_MOVE; // TODO: Likely clean this up
-        Colour stm = board->sideToMove;
-        bestScore = attackersTo(board, getKingSquare(board, stm), stm, getOccupiedSquares(board)) ? CHECKMATED - depth : DRAW; // TODO: Temporary solution, should this be considered EXACT bound?
+        bestScore = board->checkers ? CHECKMATED - depth : DRAW; // TODO: Should this be considered EXACT bound?
     }
     /*                                   */
 
@@ -99,13 +98,43 @@ int alphaBeta(ChessBoard *board, int alpha, int beta, int depth, SearchHelper *s
 }
 
 int quiescenceSearch(ChessBoard *board, int alpha, int beta) {
+    /* Stand Pat */
+    int bestScore = board->checkers ? -INFINITE : evaluation(board); // TODO: Technically unnecessary to check alpha and beta if -INFINITE
+    if (bestScore >= beta) return bestScore; // Fail Soft
+    if (bestScore > alpha) alpha = bestScore;
+    /*           */
+
+    /* Main Moves Loop */
+    IrreversibleBoardState ibs;
     Move moveList[256];
-    Move *endList = createMoveList(board, moveList);
+    Move *endList = board->checkers ? createMoveList(board, moveList) : moveList; // TODO: Need to do capture moves
     Bitboard pinnedPieces = getPinnedPieces(board);
-    for (Move *move = moveList; move != endList; move++) 
-        if (isLegalMove(board, move, pinnedPieces)) return evaluation(board); // TODO: Not a true qsearch, we are just trying to ensure that we don't do a static evaluation for a checkmate position
-    Colour stm = board->sideToMove;
-    return attackersTo(board, getKingSquare(board, stm), stm, getOccupiedSquares(board)) ? CHECKMATED : DRAW; // TODO: Temporary solution, should this be considered EXACT bound?
+    for (Move *move = moveList; move != endList; move++) {
+        if (!isLegalMove(board, move, pinnedPieces)) continue;
+        makeMove(board, move, &ibs);
+        int score = -quiescenceSearch(board, -beta, -alpha);
+        undoMove(board, move, &ibs);
+
+        // bestScore <= alpha < beta
+        if (score > bestScore) {
+            bestScore = score;
+            if (score > alpha) {
+                if (score >= beta) {
+                    return score; // Fail Soft
+                }
+                alpha = score; 
+            }
+        }
+    }
+    /*                 */
+
+    /* Checkmate and Stalemate Detection */
+    if (bestScore == -INFINITE) { // Something is always better than nothing, so bestScore stays -INFINITE if it couldn't play any move
+        bestScore = board->checkers ? CHECKMATED : DRAW; // TODO: Depth/Ply correction
+    }
+    /*                                   */
+
+    return bestScore; // Fail Soft
 } 
 
 void encodePrincipalVariation(char* buffer, const Move *pv) {
