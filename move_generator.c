@@ -101,17 +101,17 @@ Move* generateAllMoves(const ChessBoard *board, Move *moveList, Bitboard validSq
     moveList = generateNonPawnMoves(board, moveList, validSquares, BISHOP);
     moveList = generateNonPawnMoves(board, moveList, validSquares, ROOK);
     moveList = generateNonPawnMoves(board, moveList, validSquares, QUEEN);
-    moveList = generateNonPawnMoves(board, moveList, ENTIRE_BOARD & ~getPieces(board, getSideToMove(board), ALL_PIECES), KING);
+    moveList = generateNonPawnMoves(board, moveList, ENTIRE_BOARD & ~getPieces(board, board->sideToMove, ALL_PIECES), KING);
     return moveList;
 }
 
 Move* generatePawnMoves(const ChessBoard *board, Move *moveList, Bitboard validSquares) {
-    Colour stm = getSideToMove(board);
+    Colour stm = board->sideToMove;
     Colour enemy = stm ^ 1;
     Bitboard stmPawns = getPieces(board, stm, PAWN);
     Bitboard enemyPieces = getPieces(board, enemy, ALL_PIECES);
     Bitboard empty = ~getOccupiedSquares(board);
-    Square enPassant = getEnPassantSquare(board);
+    Square enPassant = board->enPassant;
 
     Direction pawnPush = stm ? SOUTH : NORTH;
     Bitboard relative4thRank = stm ? RANK_5_BB : RANK_4_BB;
@@ -182,7 +182,7 @@ Move* generatePawnMoves(const ChessBoard *board, Move *moveList, Bitboard validS
 }
 
 Move* generateNonPawnMoves(const ChessBoard *board, Move *moveList, Bitboard validSquares, PieceType pt) {
-    Colour stm = getSideToMove(board);
+    Colour stm = board->sideToMove;
     Bitboard stmPieces = getPieces(board, stm, pt);
     Bitboard enemyPieces = getPieces(board, stm ^ 1, ALL_PIECES);
     Bitboard occupied = getPieces(board, stm, ALL_PIECES) | enemyPieces;
@@ -199,9 +199,9 @@ Move* generateNonPawnMoves(const ChessBoard *board, Move *moveList, Bitboard val
 }
 
 Move* generateCastleMoves(const ChessBoard *board, Move *moveList) {
-    Colour stm = getSideToMove(board);
+    Colour stm = board->sideToMove;
     CastlingRights stmRights = stm ? BLACK_RIGHTS : WHITE_RIGHTS;
-    stmRights &= getCastlingRights(board);
+    stmRights &= board->castlingRights;
     if (stmRights) { 
         const Square knightSquare[CASTLING_SIDES][COLOURS] = {{G1, G8}, {B1, B8}};
         const Square castlePathStartSquare[CASTLING_SIDES][COLOURS] = {{F1, F8}, {D1, D8}};

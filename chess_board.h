@@ -32,24 +32,12 @@ extern Bitboard inBetweenLine[SQUARES][SQUARES];
 extern const char *SQUARE_NAME[];
 extern const char PROMOTION_NAME[];
 
-inline Colour getSideToMove(const ChessBoard *board) {
-    return board->sideToMove;
-}
-
 inline Bitboard getPieces(const ChessBoard *board, Colour c, PieceType pt) {
     return board->pieces[c][pt];
 }
 
 inline Bitboard getOccupiedSquares(const ChessBoard *board) {
     return board->pieces[WHITE][ALL_PIECES] | board->pieces[BLACK][ALL_PIECES];
-}
-
-inline Square getEnPassantSquare(const ChessBoard *board) {
-    return board->enPassant;
-}
-
-inline CastlingRights getCastlingRights(const ChessBoard *board) {
-    return board->castlingRights;
 }
 
 inline Square getKingSquare(const ChessBoard *board, Colour c) {

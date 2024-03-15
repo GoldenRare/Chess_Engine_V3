@@ -264,7 +264,7 @@ bool isLegalMove(const ChessBoard *board, const Move *move, Bitboard pinned) {
 }
 
 Bitboard getPinnedPieces(const ChessBoard *board) {
-    Colour stm = getSideToMove(board);
+    Colour stm = board->sideToMove;
     Colour enemy = stm ^ 1;
     Square kingSq = getKingSquare(board, stm);
     Bitboard enemyQueens = getPieces(board, enemy, QUEEN);
