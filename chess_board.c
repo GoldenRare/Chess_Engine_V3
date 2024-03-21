@@ -263,6 +263,17 @@ bool isLegalMove(const ChessBoard *board, const Move *move, Bitboard pinned) {
     return !(pinned & fromSquareBB) || fullLine[fromSquare][toSquare] & squareToBitboard(kingSquare);
 }
 
+// TODO: Operation is currently expensive
+bool isPseudoMove(const ChessBoard *board, Move move) {
+    Move moveList[256];
+    Move *startList = moveList;
+    Move *endList = createMoveList(board, moveList);
+    while (startList < endList) {
+        if (*startList++ == move) return true;
+    }
+    return false;
+}
+
 Bitboard getPinnedPieces(const ChessBoard *board) {
     Colour stm = board->sideToMove;
     Colour enemy = stm ^ 1;

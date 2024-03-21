@@ -60,6 +60,7 @@ void removePiece(ChessBoard *board, Colour c, PieceType pt, Square sq);
 void makeMove(ChessBoard *board, const Move *move, IrreversibleBoardState *ibs);
 void undoMove(ChessBoard *board, const Move *move, const IrreversibleBoardState *ibs);
 bool isLegalMove(const ChessBoard *board, const Move *move, Bitboard pinned);
+bool isPseudoMove(const ChessBoard *board, Move move);
 
 Bitboard getPinnedPieces(const ChessBoard *board);
 Bitboard attackersTo(const ChessBoard *board, Square sq, Colour attackedSide, Bitboard occupied);
