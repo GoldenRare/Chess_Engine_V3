@@ -21,7 +21,7 @@ static const char *setoption = "setoption";
 
 void uciLoop() {
     ChessBoard board;
-    char input[256]; // TODO: Figure out max size
+    char input[512]; // TODO: Figure out max size
     char *token = "";
 
     while (!token || strcmp(token, quit)) {
