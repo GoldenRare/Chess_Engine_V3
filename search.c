@@ -7,7 +7,7 @@
 #include "move_generator.h"
 #include "evaluation.h"
 #include "transposition_table.h"
-#include "move_sorter.h"
+#include "move_selector.h"
 
 void startSearch(ChessBoard *board, int depth) {
     SearchHelper sh[MAX_DEPTH + 1]; //TODO: SIZE
@@ -57,29 +57,29 @@ int alphaBeta(ChessBoard *board, int alpha, int beta, int depth, SearchHelper *s
     childrenPv[0] = NO_MOVE;
 
     IrreversibleBoardState ibs;
-    Move moveList[256];
-    Move *endList = createMoveList(board, moveList);
-    sortMoves(moveList, endList, ttMove);
+    MoveSelector ms;
+    createMoveSelector(&ms, TT_MOVE, ttMove);
     Bitboard pinnedPieces = getPinnedPieces(board);
 
     int bestScore = -INFINITE;
     Move bestMove = NO_MOVE;
-    for (Move *move = moveList; move != endList; move++) {
-        if (!isLegalMove(board, move, pinnedPieces)) continue;
-        makeMove(board, move, &ibs);
+    Move move;
+    while ((move = getNextBestMove(board, &ms))) {
+        if (!isLegalMove(board, &move, pinnedPieces)) continue;
+        makeMove(board, &move, &ibs);
         int score = -alphaBeta(board, -beta, -alpha, depth - 1, sh + 1, false);
-        undoMove(board, move, &ibs);
+        undoMove(board, &move, &ibs);
 
         // bestScore <= alpha < beta
         if (score > bestScore) {
             bestScore = score;
             if (score > alpha) {
                 if (score >= beta) {
-                    savePositionEvaluation(pe, board->positionKey, *move, depth, LOWER, score);
+                    savePositionEvaluation(pe, board->positionKey, move, depth, LOWER, score);
                     return score; // Fail Soft
                 }
-                updatePrincipalVariation(*move, sh->pv, childrenPv);
-                bestMove = *move;
+                updatePrincipalVariation(move, sh->pv, childrenPv);
+                bestMove = move;
                 alpha = score; 
             }
         }

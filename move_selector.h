@@ -20,6 +20,7 @@ typedef struct MoveSelector {
 inline void createMoveSelector(MoveSelector *ms, MoveSelectorState state, Move ttMove) {
     ms->state = state;
     ms->ttMove = ttMove;
+    ms->startList = ms->moveList;
 }
 
 Move getNextBestMove(const ChessBoard *board, MoveSelector *ms);
