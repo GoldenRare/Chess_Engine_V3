@@ -81,7 +81,7 @@ Bitboard generateKingAttacks(Bitboard kingSq) {
     return attacks | shiftBitboard(kingSq, NORTH) | shiftBitboard(kingSq, SOUTH);
 }
 
-Move* createMoveList(const ChessBoard *board, Move *moveList) {
+MoveObject* createMoveList(const ChessBoard *board, MoveObject *moveList) {
     Colour stm = board->sideToMove;
     Square kingSq = getKingSquare(board, stm); 
     if (!board->checkers) {
@@ -95,7 +95,7 @@ Move* createMoveList(const ChessBoard *board, Move *moveList) {
     }
 }
 
-Move* generateAllMoves(const ChessBoard *board, Move *moveList, Bitboard validSquares) {
+MoveObject* generateAllMoves(const ChessBoard *board, MoveObject *moveList, Bitboard validSquares) {
     moveList = generatePawnMoves(board, moveList, validSquares);
     moveList = generateNonPawnMoves(board, moveList, validSquares, KNIGHT);
     moveList = generateNonPawnMoves(board, moveList, validSquares, BISHOP);
@@ -105,7 +105,7 @@ Move* generateAllMoves(const ChessBoard *board, Move *moveList, Bitboard validSq
     return moveList;
 }
 
-Move* generatePawnMoves(const ChessBoard *board, Move *moveList, Bitboard validSquares) {
+MoveObject* generatePawnMoves(const ChessBoard *board, MoveObject *moveList, Bitboard validSquares) {
     Colour stm = board->sideToMove;
     Colour enemy = stm ^ 1;
     Bitboard stmPawns = getPieces(board, stm, PAWN);
@@ -181,7 +181,7 @@ Move* generatePawnMoves(const ChessBoard *board, Move *moveList, Bitboard validS
     return moveList;
 }
 
-Move* generateNonPawnMoves(const ChessBoard *board, Move *moveList, Bitboard validSquares, PieceType pt) {
+MoveObject* generateNonPawnMoves(const ChessBoard *board, MoveObject *moveList, Bitboard validSquares, PieceType pt) {
     Colour stm = board->sideToMove;
     Bitboard stmPieces = getPieces(board, stm, pt);
     Bitboard enemyPieces = getPieces(board, stm ^ 1, ALL_PIECES);
@@ -198,7 +198,7 @@ Move* generateNonPawnMoves(const ChessBoard *board, Move *moveList, Bitboard val
     return moveList;
 }
 
-Move* generateCastleMoves(const ChessBoard *board, Move *moveList) {
+MoveObject* generateCastleMoves(const ChessBoard *board, MoveObject *moveList) {
     Colour stm = board->sideToMove;
     CastlingRights stmRights = stm ? BLACK_RIGHTS : WHITE_RIGHTS;
     stmRights &= board->castlingRights;

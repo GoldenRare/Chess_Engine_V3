@@ -265,11 +265,12 @@ bool isLegalMove(const ChessBoard *board, const Move *move, Bitboard pinned) {
 
 // TODO: Operation is currently expensive
 bool isPseudoMove(const ChessBoard *board, Move move) {
-    Move moveList[256];
-    Move *startList = moveList;
-    Move *endList = createMoveList(board, moveList);
+    MoveObject moveList[256];
+    MoveObject *startList = moveList;
+    MoveObject *endList = createMoveList(board, moveList);
     while (startList < endList) {
-        if (*startList++ == move) return true;
+        if (startList->move == move) return true;
+        startList++;
     }
     return false;
 }

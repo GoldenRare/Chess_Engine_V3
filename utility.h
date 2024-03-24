@@ -101,6 +101,11 @@ enum Bound {
 };
 typedef enum Bound Bound;
 
+typedef struct MoveObject {
+    Move move;
+    uint16_t score;
+} MoveObject;
+
 inline Rank squareToRank(Square sq) {
     return RANK_8 - (sq >> 3);
 }
@@ -146,8 +151,8 @@ inline Square bitboardToSquareWithReset(Bitboard *b) {
     return sq;
 }
 
-inline void setMove(Move *move, Square fromSquare, Square toSquare, MoveType moveType) {
-    *move = moveType << 12 | toSquare << 6 | fromSquare;
+inline void setMove(MoveObject *move, Square fromSquare, Square toSquare, MoveType moveType) {
+    move->move = moveType << 12 | toSquare << 6 | fromSquare;
 }
 
 inline Square getFromSquare(const Move *move) {

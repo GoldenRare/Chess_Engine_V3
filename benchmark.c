@@ -51,14 +51,14 @@ uint64_t perft(ChessBoard *board, int depth) {
 
     uint64_t nodes = 0;
     IrreversibleBoardState ibs;
-    Move moveList[256];
-    Move *endList = createMoveList(board, moveList);
+    MoveObject moveList[256];
+    MoveObject *endList = createMoveList(board, moveList);
     Bitboard pinnedPieces = getPinnedPieces(board);
-    for (Move *move = moveList; move != endList; move++) {
-        if (!isLegalMove(board, move, pinnedPieces)) continue;
-        makeMove(board, move, &ibs);
+    for (MoveObject *move = moveList; move != endList; move++) {
+        if (!isLegalMove(board, &move->move, pinnedPieces)) continue;
+        makeMove(board, &move->move, &ibs);
         nodes += perft(board, depth - 1);
-        undoMove(board, move, &ibs);
+        undoMove(board, &move->move, &ibs);
     }
     return nodes;
 }

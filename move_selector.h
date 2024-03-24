@@ -5,16 +5,16 @@
 #include "utility.h"
 
 enum MoveSelectorState {
-    TT_MOVE, ALL_MOVES_INIT, ALL_MOVES
+    TT_MOVE, ALL_MOVES_INIT, ALL_MOVES, TEMP
 };
 typedef enum MoveSelectorState MoveSelectorState;
 
 typedef struct MoveSelector {
-    Move *startList;
-    Move *endList;
+    MoveObject *startList;
+    MoveObject *endList;
+    MoveObject moveList[256];
     MoveSelectorState state;
     Move ttMove;
-    Move moveList[256];
 } MoveSelector;
 
 inline void createMoveSelector(MoveSelector *ms, MoveSelectorState state, Move ttMove) {
@@ -24,5 +24,6 @@ inline void createMoveSelector(MoveSelector *ms, MoveSelectorState state, Move t
 }
 
 Move getNextBestMove(const ChessBoard *board, MoveSelector *ms);
+void scoreMoves(MoveSelector *ms);
 
 #endif

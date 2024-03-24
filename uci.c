@@ -90,17 +90,19 @@ void processPositionCommand(ChessBoard *board) {
 void processMoves(ChessBoard *board) {
     char *moveStr;
     while ((moveStr = strtok(NULL, " ")) != NULL) {
-        Move moveList[MAX_MOVES];
-        Move *move;
+        MoveObject moveList[MAX_MOVES];
+        MoveObject *endList = createMoveList(board, moveList);
         char moveToName[6] = "";
-        createMoveList(board, moveList);
-        for (move = moveList; strcmp(moveStr, moveToName) != 0; move++) {
-            MoveType moveType = getMoveType(move);
+        for (MoveObject *startList = moveList; startList < endList; startList++) {
+            MoveType moveType = getMoveType(&startList->move);
             char promotionPiece = moveType & PROMOTION ? PROMOTION_NAME[moveType & PROMOTION_PIECE_OFFSET_MASK] : '\0';
-            encodeChessMove(moveToName, SQUARE_NAME[getFromSquare(move)], SQUARE_NAME[getToSquare(move)], promotionPiece);
+            encodeChessMove(moveToName, SQUARE_NAME[getFromSquare(&startList->move)], SQUARE_NAME[getToSquare(&startList->move)], promotionPiece);
+            if (strcmp(moveStr, moveToName) == 0) {
+                IrreversibleBoardState ibs;
+                makeMove(board, &startList->move, &ibs);
+                break;
+            }
         }
-        IrreversibleBoardState ibs;
-        makeMove(board, --move, &ibs);
     }
 }
 

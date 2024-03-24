@@ -106,14 +106,17 @@ int quiescenceSearch(ChessBoard *board, int alpha, int beta) {
 
     /* Main Moves Loop */
     IrreversibleBoardState ibs;
-    Move moveList[256];
-    Move *endList = board->checkers ? createMoveList(board, moveList) : moveList; // TODO: Need to do capture moves
+    MoveSelector ms;
+    MoveSelectorState state = board->checkers ? ALL_MOVES_INIT : TEMP; // TODO: Need to do capture moves
+    createMoveSelector(&ms, state, NO_MOVE);
     Bitboard pinnedPieces = getPinnedPieces(board);
-    for (Move *move = moveList; move != endList; move++) {
-        if (!isLegalMove(board, move, pinnedPieces)) continue;
-        makeMove(board, move, &ibs);
+
+    Move move;
+    while ((move = getNextBestMove(board, &ms))) {
+        if (!isLegalMove(board, &move, pinnedPieces)) continue;
+        makeMove(board, &move, &ibs);
         int score = -quiescenceSearch(board, -beta, -alpha);
-        undoMove(board, move, &ibs);
+        undoMove(board, &move, &ibs);
 
         // bestScore <= alpha < beta
         if (score > bestScore) {

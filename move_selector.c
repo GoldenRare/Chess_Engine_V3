@@ -15,10 +15,16 @@ Move getNextBestMove(const ChessBoard *board, MoveSelector *ms) {
                 break;
             case ALL_MOVES:
                 while (ms->startList < ms->endList) {
-                    if (*ms->startList != ms->ttMove) return *ms->startList++;
+                    if (ms->startList->move != ms->ttMove) return (ms->startList++)->move;
                     ms->startList++;
                 }
                 return NO_MOVE;
+            case TEMP:
+                return NO_MOVE;
         }
     }
+}
+
+void scoreMoves(MoveSelector *ms) {
+
 }
