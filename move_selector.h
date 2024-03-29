@@ -23,7 +23,13 @@ inline void createMoveSelector(MoveSelector *ms, MoveSelectorState state, Move t
     ms->startList = ms->moveList;
 }
 
+inline void swap(MoveObject *mo1, MoveObject *mo2) {
+    MoveObject temp = *mo1;
+    *mo1 = *mo2;
+    *mo2 = temp;
+}
+
 Move getNextBestMove(const ChessBoard *board, MoveSelector *ms);
-void scoreMoves(MoveSelector *ms);
+void scoreMoves(const ChessBoard *board, MoveSelector *ms);
 
 #endif
