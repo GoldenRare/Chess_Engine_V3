@@ -2,6 +2,8 @@
 #include "chess_board.h"
 #include "utility.h"
 
+const Score PIECE_VALUE[ALL_PIECES] = {100, 300, 306, 500, 900, 0};
+
 int evaluation(const ChessBoard *board) {
     int score = 9 * (populationCount(getPieces(board, WHITE, QUEEN )) - populationCount(getPieces(board, BLACK, QUEEN )))
               + 5 * (populationCount(getPieces(board, WHITE, ROOK  )) - populationCount(getPieces(board, BLACK, ROOK  )))
