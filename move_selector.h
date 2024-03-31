@@ -30,6 +30,8 @@ inline void swap(MoveObject *mo1, MoveObject *mo2) {
 }
 
 Move getNextBestMove(const ChessBoard *board, MoveSelector *ms);
+Move getNextHighestScoringMove(MoveSelector *ms);
+
 void scoreMoves(const ChessBoard *board, MoveSelector *ms);
 
 #endif
