@@ -42,8 +42,12 @@ void scoreMoves(const ChessBoard *board, MoveSelector *ms) {
     while (startList < ms->endList) {
         MoveType moveType = getMoveType(&startList->move);
         if (moveType & CAPTURE) {
-            startList->score = moveType == EN_PASSANT_CAPTURE ? 1 
+            startList->score = moveType == EN_PASSANT_CAPTURE ? 90 
                              : PIECE_VALUE[board->pieceTypes[getToSquare(&startList->move)]] - board->pieceTypes[getFromSquare(&startList->move)];
+        } else if (startList->move == ms->killers[0]) {
+            startList->score = 51;
+        } else if (startList->move == ms->killers[1]) {
+            startList->score = 50;
         } else {
             startList->score = 0;
         }

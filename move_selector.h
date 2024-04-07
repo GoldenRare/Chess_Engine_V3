@@ -15,12 +15,15 @@ typedef struct MoveSelector {
     MoveObject moveList[256];
     MoveSelectorState state;
     Move ttMove;
+    Move killers[2];
 } MoveSelector;
 
-inline void createMoveSelector(MoveSelector *ms, MoveSelectorState state, Move ttMove) {
+inline void createMoveSelector(MoveSelector *ms, MoveSelectorState state, Move ttMove, Move *killers) {
     ms->state = state;
     ms->ttMove = ttMove;
     ms->startList = ms->moveList;
+    ms->killers[0] = killers[0];
+    ms->killers[1] = killers[1];
 }
 
 inline void swap(MoveObject *mo1, MoveObject *mo2) {
