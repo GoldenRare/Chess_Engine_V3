@@ -182,10 +182,9 @@ MoveObject* generatePawnMoves(const ChessBoard *board, MoveObject *moveList, Bit
 }
 
 MoveObject* generateNonPawnMoves(const ChessBoard *board, MoveObject *moveList, Bitboard validSquares, PieceType pt) {
-    Colour stm = board->sideToMove;
-    Bitboard stmPieces = getPieces(board, stm, pt);
-    Bitboard enemyPieces = getPieces(board, stm ^ 1, ALL_PIECES);
-    Bitboard occupied = getPieces(board, stm, ALL_PIECES) | enemyPieces;
+    Bitboard stmPieces = getPieces(board, board->sideToMove, pt);
+    Bitboard enemyPieces = getPieces(board, board->sideToMove ^ 1, ALL_PIECES);
+    Bitboard occupied = getPieces(board, board->sideToMove, ALL_PIECES) | enemyPieces;
     while (stmPieces) {
         Square fromSq = bitboardToSquareWithReset(&stmPieces);
         Bitboard validAttacks = getAttacks(pt, occupied, fromSq) & validSquares;
