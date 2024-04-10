@@ -26,6 +26,11 @@ enum NonSliderAttacker {
 };
 typedef enum NonSliderAttacker NonSliderAttacker;
 
+enum MoveGenerationStage {
+    CAPTURES, NON_CAPTURES
+};
+typedef enum MoveGenerationStage MoveGenerationStage;
+
 extern Magic magicTable[MAGIC_INDICES][SQUARES];
 extern Bitboard pawnAttacks[COLOURS][SQUARES];
 extern Bitboard nonSlidingAttacks[NON_SLIDER_ATTACKERS][SQUARES]; // Does not include pawns

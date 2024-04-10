@@ -82,16 +82,15 @@ Bitboard generateKingAttacks(Bitboard kingSq) {
 }
 
 MoveObject* createMoveList(const ChessBoard *board, MoveObject *moveList) {
-    Colour stm = board->sideToMove;
-    Square kingSq = getKingSquare(board, stm); 
     if (!board->checkers) {
-        moveList = generateAllMoves(board, moveList, ENTIRE_BOARD & ~getPieces(board, stm, ALL_PIECES));
+        moveList = generateAllMoves(board, moveList, ENTIRE_BOARD & ~getPieces(board, board->sideToMove, ALL_PIECES));
         return generateCastleMoves(board, moveList);
     } else if (populationCount(board->checkers) == 1) {
-        Bitboard validSquares = (inBetweenLine[kingSq][bitboardToSquare(board->checkers)] | board->checkers) & ~getPieces(board, stm, ALL_PIECES);
+        Bitboard validSquares = (inBetweenLine[getKingSquare(board, board->sideToMove)][bitboardToSquare(board->checkers)] | board->checkers) 
+                              & ~getPieces(board, board->sideToMove, ALL_PIECES);
         return generateAllMoves(board, moveList, validSquares);
     } else {
-        return generateNonPawnMoves(board, moveList, ENTIRE_BOARD & ~getPieces(board, stm, ALL_PIECES), KING);
+        return generateNonPawnMoves(board, moveList, ENTIRE_BOARD & ~getPieces(board, board->sideToMove, ALL_PIECES), KING);
     }
 }
 
