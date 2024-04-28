@@ -65,9 +65,9 @@ Bitboard generateKnightAttacks(Bitboard knightSq);
 Bitboard generateSlidingAttacks(const Direction directions[], size_t numDirections, Square sq, Bitboard occupied);
 Bitboard generateKingAttacks(Bitboard kingSq);
 
-MoveObject* createMoveList(const ChessBoard *board, MoveObject *moveList);
-MoveObject* generateAllMoves(const ChessBoard *board, MoveObject *moveList, Bitboard validSquares);
-MoveObject* generatePawnMoves(const ChessBoard *board, MoveObject *moveList, Bitboard validSquares);
+MoveObject* createMoveList(const ChessBoard *board, MoveObject *moveList, MoveGenerationStage stage);
+MoveObject* generateAllMoves(const ChessBoard *board, MoveObject *moveList, Bitboard validSquares, MoveGenerationStage stage);
+MoveObject* generatePawnMoves(const ChessBoard *board, MoveObject *moveList, Bitboard validSquares, MoveGenerationStage stage);
 MoveObject* generateNonPawnMoves(const ChessBoard *board, MoveObject *moveList, Bitboard validSquares, PieceType pt);
 MoveObject* generateCastleMoves(const ChessBoard *board, MoveObject *moveList);
 

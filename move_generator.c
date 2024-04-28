@@ -81,42 +81,36 @@ Bitboard generateKingAttacks(Bitboard kingSq) {
     return attacks | shiftBitboard(kingSq, NORTH) | shiftBitboard(kingSq, SOUTH);
 }
 
-MoveObject* createMoveList(const ChessBoard *board, MoveObject *moveList) {
+MoveObject* createMoveList(const ChessBoard *board, MoveObject *moveList, MoveGenerationStage stage) {
+    Bitboard validSquares = stage == CAPTURES ? getPieces(board, board->sideToMove ^ 1, ALL_PIECES) : ~getOccupiedSquares(board);
     if (!board->checkers) {
-        moveList = generateAllMoves(board, moveList, ENTIRE_BOARD & ~getPieces(board, board->sideToMove, ALL_PIECES));
-        return generateCastleMoves(board, moveList);
+        moveList = generateAllMoves(board, moveList, validSquares, stage);
+        if (stage == NON_CAPTURES) moveList = generateCastleMoves(board, moveList);
     } else if (populationCount(board->checkers) == 1) {
-        Bitboard validSquares = (inBetweenLine[getKingSquare(board, board->sideToMove)][bitboardToSquare(board->checkers)] | board->checkers) 
-                              & ~getPieces(board, board->sideToMove, ALL_PIECES);
-        return generateAllMoves(board, moveList, validSquares);
-    } else {
-        return generateNonPawnMoves(board, moveList, ENTIRE_BOARD & ~getPieces(board, board->sideToMove, ALL_PIECES), KING);
+        moveList = generateAllMoves(board, moveList, validSquares & inBetweenLine[getKingSquare(board, board->sideToMove)][bitboardToSquare(board->checkers)], stage);
     }
+    return generateNonPawnMoves(board, moveList, validSquares, KING);
 }
 
-MoveObject* generateAllMoves(const ChessBoard *board, MoveObject *moveList, Bitboard validSquares) {
-    moveList = generatePawnMoves(board, moveList, validSquares);
+MoveObject* generateAllMoves(const ChessBoard *board, MoveObject *moveList, Bitboard validSquares, MoveGenerationStage stage) {
+    moveList = generatePawnMoves(board, moveList, validSquares, stage);
     moveList = generateNonPawnMoves(board, moveList, validSquares, KNIGHT);
     moveList = generateNonPawnMoves(board, moveList, validSquares, BISHOP);
     moveList = generateNonPawnMoves(board, moveList, validSquares, ROOK);
     moveList = generateNonPawnMoves(board, moveList, validSquares, QUEEN);
-    moveList = generateNonPawnMoves(board, moveList, ENTIRE_BOARD & ~getPieces(board, board->sideToMove, ALL_PIECES), KING);
     return moveList;
 }
 
-MoveObject* generatePawnMoves(const ChessBoard *board, MoveObject *moveList, Bitboard validSquares) {
-    Colour stm = board->sideToMove;
-    Colour enemy = stm ^ 1;
-    Bitboard stmPawns = getPieces(board, stm, PAWN);
+MoveObject* generatePawnMoves(const ChessBoard *board, MoveObject *moveList, Bitboard validSquares, MoveGenerationStage stage) {
+    Colour enemy = board->sideToMove ^ 1;
+    Bitboard stmPawns = getPieces(board, board->sideToMove, PAWN);
     Bitboard enemyPieces = getPieces(board, enemy, ALL_PIECES);
     Bitboard empty = ~getOccupiedSquares(board);
-    Square enPassant = board->enPassant;
 
-    Direction pawnPush = stm ? SOUTH : NORTH;
-    Bitboard relative4thRank = stm ? RANK_5_BB : RANK_4_BB;
-    Bitboard relative7thRank = stm ? RANK_2_BB : RANK_7_BB;
+    Direction pawnPush = board->sideToMove ? SOUTH : NORTH;
+    Bitboard relative4thRank = board->sideToMove ? RANK_5_BB : RANK_4_BB;
     
-    Bitboard pawnsOn7thRank = stmPawns & relative7thRank;
+    Bitboard pawnsOn7thRank = stmPawns & (board->sideToMove ? RANK_2_BB : RANK_7_BB);
     Bitboard pawnsNotOn7thRank = stmPawns ^ pawnsOn7thRank;
     
     Bitboard pawnsAbleToPush = shiftBitboard(pawnsNotOn7thRank, pawnPush) & empty;
@@ -127,7 +121,7 @@ MoveObject* generatePawnMoves(const ChessBoard *board, MoveObject *moveList, Bit
     /* PAWNS ON 7th RANK HANDLING */
     while (pawnsOn7thRank) {
         Square fromSq = bitboardToSquareWithReset(&pawnsOn7thRank);
-        Bitboard captures = getPawnAttacks(stm, fromSq) & enemyPieces & validSquares;
+        Bitboard captures = getPawnAttacks(board->sideToMove, fromSq) & enemyPieces & validSquares;
         while (captures) {
             Square toSq = bitboardToSquareWithReset(&captures);
             setMove(moveList++, fromSq, toSq, QUEEN_PROMOTION_CAPTURE);
@@ -148,32 +142,36 @@ MoveObject* generatePawnMoves(const ChessBoard *board, MoveObject *moveList, Bit
     /*                            */
 
     /* PAWNS NOT ON 7th RANK HANDLING */
-    if (enPassant != NO_SQUARE) {
-        bool notInCheck = (validSquares | getPieces(board, stm, ALL_PIECES)) == ENTIRE_BOARD;
-        if (notInCheck || !(squareToBitboard(moveSquareInDirection(enPassant, pawnPush)) & validSquares)) {
-            Bitboard enPassantCapturers = getPawnAttacks(enemy, enPassant) & pawnsNotOn7thRank;
+    if (board->enPassant != NO_SQUARE && stage == CAPTURES) {
+        Bitboard enPassantCapturers = getPawnAttacks(enemy, board->enPassant) & pawnsNotOn7thRank;
             while (enPassantCapturers) {
-                setMove(moveList++, bitboardToSquareWithReset(&enPassantCapturers), enPassant, EN_PASSANT_CAPTURE);
+                setMove(moveList++, bitboardToSquareWithReset(&enPassantCapturers), board->enPassant, EN_PASSANT_CAPTURE);
             }
-        }
     }
 
-    while (pawnsNotOn7thRank) {
-        Square fromSq = bitboardToSquareWithReset(&pawnsNotOn7thRank);
-        Bitboard captures = getPawnAttacks(stm, fromSq) & enemyPieces & validSquares;
-        while (captures) setMove(moveList++, fromSq, bitboardToSquareWithReset(&captures), CAPTURE);
-    } 
+    Direction eastCaptureDirection = board->sideToMove ? SOUTH_EAST : NORTH_EAST;
+    Direction westCaptureDirection = board->sideToMove ? SOUTH_WEST : NORTH_WEST;
+    Bitboard eastCaptures = shiftBitboard(pawnsNotOn7thRank & ~FILE_H_BB, eastCaptureDirection) & enemyPieces & validSquares;
+    Bitboard westCaptures = shiftBitboard(pawnsNotOn7thRank & ~FILE_A_BB, westCaptureDirection) & enemyPieces & validSquares;
+
+    while (eastCaptures) {
+        Square toSq = bitboardToSquareWithReset(&eastCaptures);
+        setMove(moveList++, moveSquareInDirection(toSq, -eastCaptureDirection), toSq, CAPTURE);
+    }
+
+    while (westCaptures) {
+        Square toSq = bitboardToSquareWithReset(&westCaptures);
+        setMove(moveList++, moveSquareInDirection(toSq, -westCaptureDirection), toSq, CAPTURE);
+    }
 
     while (pawnsAbleToPushTwice) {
         Square toSq = bitboardToSquareWithReset(&pawnsAbleToPushTwice);
-        Square fromSq = moveSquareInDirection(toSq, 2 * -pawnPush);
-        setMove(moveList++, fromSq, toSq, DOUBLE_PAWN_PUSH);
+        setMove(moveList++, moveSquareInDirection(toSq, 2 * -pawnPush), toSq, DOUBLE_PAWN_PUSH);
     }
 
     while (pawnsAbleToPush) {
         Square toSq = bitboardToSquareWithReset(&pawnsAbleToPush);
-        Square fromSq = moveSquareInDirection(toSq, -pawnPush);
-        setMove(moveList++, fromSq, toSq, QUIET);
+        setMove(moveList++, moveSquareInDirection(toSq, -pawnPush), toSq, QUIET);
     }
     /*                                */
 
