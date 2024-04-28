@@ -189,4 +189,10 @@ inline void encodeChessMove(char *destination, const char *fromSquare, const cha
     destination[5] = '\0';
 }
 
+inline bool isAdjacentSquare(Square fromSq, Square toSq) {
+    int rankDistance = abs((int) squareToRank(toSq) - (int) squareToRank(fromSq));
+    int fileDistance = abs((int) squareToFile(toSq) - (int) squareToFile(fromSq));
+    return max(rankDistance, fileDistance) == 1;
+}
+
 #endif

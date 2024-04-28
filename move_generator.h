@@ -71,7 +71,4 @@ MoveObject* generatePawnMoves(const ChessBoard *board, MoveObject *moveList, Bit
 MoveObject* generateNonPawnMoves(const ChessBoard *board, MoveObject *moveList, Bitboard validSquares, PieceType pt);
 MoveObject* generateCastleMoves(const ChessBoard *board, MoveObject *moveList);
 
-/* Essentially checks if fromSq and toSq are within a king ring distance from each other. */
-bool isDirectionMaintained(Square fromSq, Square toSq); 
-
 #endif

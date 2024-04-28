@@ -64,7 +64,7 @@ Bitboard generateSlidingAttacks(const Direction directions[], size_t numDirectio
         Square fromSq = sq;
         Square toSq = moveSquareInDirection(sq, directions[i]);
         Bitboard toSquareBB = shiftBitboard(squareToBitboard(sq), directions[i]);
-        while (toSquareBB && isDirectionMaintained(fromSq, toSq)) {
+        while (toSquareBB && isAdjacentSquare(fromSq, toSq)) {
             attacks |= toSquareBB;
             if (toSquareBB & occupied) break;
             toSquareBB = shiftBitboard(toSquareBB, directions[i]);
@@ -210,10 +210,4 @@ MoveObject* generateCastleMoves(const ChessBoard *board, MoveObject *moveList) {
         }
     }
     return moveList;
-}
-
-bool isDirectionMaintained(Square fromSq, Square toSq) {
-    int rankDistance = abs((int) squareToRank(toSq) - (int) squareToRank(fromSq));
-    int fileDistance = abs((int) squareToFile(toSq) - (int) squareToFile(fromSq));
-    return max(rankDistance, fileDistance) == 1;
 }
