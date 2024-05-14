@@ -57,6 +57,14 @@ inline Bitboard getAttacks(PieceType pt, Bitboard occupied, Square sq) {
          :                getNonSlidingAttacks(KING_ATTACKER, sq);
 }
 
+inline MoveObject* generatePromotions(MoveObject *moveList, Square fromSq, Square toSq) { 
+    setMove(moveList++, fromSq, toSq, QUEEN_PROMOTION );
+    setMove(moveList++, fromSq, toSq, ROOK_PROMOTION  );
+    setMove(moveList++, fromSq, toSq, BISHOP_PROMOTION);
+    setMove(moveList++, fromSq, toSq, KNIGHT_PROMOTION);
+    return moveList;
+}
+
 void initializeMoveGenerator();
 void initializeNonSlidingAttacks();
 void initializeSlidingAttacks();
@@ -66,9 +74,9 @@ Bitboard generateSlidingAttacks(const Direction directions[], size_t numDirectio
 Bitboard generateKingAttacks(Bitboard kingSq);
 
 MoveObject* createMoveList(const ChessBoard *board, MoveObject *moveList, MoveGenerationStage stage);
-MoveObject* generateAllMoves(const ChessBoard *board, MoveObject *moveList, Bitboard validSquares, MoveGenerationStage stage);
+MoveObject* generateNonKingMoves(const ChessBoard *board, MoveObject *moveList, Bitboard validSquares, MoveGenerationStage stage);
 MoveObject* generatePawnMoves(const ChessBoard *board, MoveObject *moveList, Bitboard validSquares, MoveGenerationStage stage);
-MoveObject* generateNonPawnMoves(const ChessBoard *board, MoveObject *moveList, Bitboard validSquares, PieceType pt);
+MoveObject* generatePieceMoves(const ChessBoard *board, MoveObject *moveList, Bitboard validSquares, PieceType pt);
 MoveObject* generateCastleMoves(const ChessBoard *board, MoveObject *moveList);
 
 #endif

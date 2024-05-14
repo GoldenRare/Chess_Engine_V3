@@ -84,20 +84,20 @@ Bitboard generateKingAttacks(Bitboard kingSq) {
 MoveObject* createMoveList(const ChessBoard *board, MoveObject *moveList, MoveGenerationStage stage) {
     Bitboard validSquares = stage == CAPTURES ? getPieces(board, board->sideToMove ^ 1, ALL_PIECES) : ~getOccupiedSquares(board);
     if (!board->checkers) {
-        moveList = generateAllMoves(board, moveList, validSquares, stage);
+        moveList = generateNonKingMoves(board, moveList, validSquares, stage);
         if (stage == NON_CAPTURES) moveList = generateCastleMoves(board, moveList);
     } else if (populationCount(board->checkers) == 1) {
-        moveList = generateAllMoves(board, moveList, validSquares & inBetweenLine[getKingSquare(board, board->sideToMove)][bitboardToSquare(board->checkers)], stage);
+        moveList = generateNonKingMoves(board, moveList, validSquares & inBetweenLine[getKingSquare(board, board->sideToMove)][bitboardToSquare(board->checkers)], stage);
     }
-    return generateNonPawnMoves(board, moveList, validSquares, KING);
+    return generatePieceMoves(board, moveList, validSquares, KING);
 }
 
-MoveObject* generateAllMoves(const ChessBoard *board, MoveObject *moveList, Bitboard validSquares, MoveGenerationStage stage) {
-    moveList = generatePawnMoves(board, moveList, validSquares, stage);
-    moveList = generateNonPawnMoves(board, moveList, validSquares, KNIGHT);
-    moveList = generateNonPawnMoves(board, moveList, validSquares, BISHOP);
-    moveList = generateNonPawnMoves(board, moveList, validSquares, ROOK);
-    moveList = generateNonPawnMoves(board, moveList, validSquares, QUEEN);
+MoveObject* generateNonKingMoves(const ChessBoard *board, MoveObject *moveList, Bitboard validSquares, MoveGenerationStage stage) {
+    moveList = generatePawnMoves (board, moveList, validSquares, stage );
+    moveList = generatePieceMoves(board, moveList, validSquares, KNIGHT);
+    moveList = generatePieceMoves(board, moveList, validSquares, BISHOP);
+    moveList = generatePieceMoves(board, moveList, validSquares, ROOK  );
+    moveList = generatePieceMoves(board, moveList, validSquares, QUEEN );
     return moveList;
 }
 
@@ -117,30 +117,22 @@ MoveObject* generatePawnMoves(const ChessBoard *board, MoveObject *moveList, Bit
 
         while (eastCapturePromotions) {
             Square toSq = bitboardToSquareWithReset(&eastCapturePromotions);
-            Square fromSq = moveSquareInDirection(toSq, -eastCaptureDirection);
-            setMove(moveList++, fromSq, toSq, QUEEN_PROMOTION_CAPTURE);
-            setMove(moveList++, fromSq, toSq, ROOK_PROMOTION_CAPTURE);
-            setMove(moveList++, fromSq, toSq, BISHOP_PROMOTION_CAPTURE);
-            setMove(moveList++, fromSq, toSq, KNIGHT_PROMOTION_CAPTURE);
+            moveList = generatePromotions(moveList, moveSquareInDirection(toSq, -eastCaptureDirection), toSq);
         }
 
         while (westCapturePromotions) {
             Square toSq = bitboardToSquareWithReset(&westCapturePromotions);
-            Square fromSq = moveSquareInDirection(toSq, -westCaptureDirection);
-            setMove(moveList++, fromSq, toSq, QUEEN_PROMOTION_CAPTURE);
-            setMove(moveList++, fromSq, toSq, ROOK_PROMOTION_CAPTURE);
-            setMove(moveList++, fromSq, toSq, BISHOP_PROMOTION_CAPTURE);
-            setMove(moveList++, fromSq, toSq, KNIGHT_PROMOTION_CAPTURE);
+            moveList = generatePromotions(moveList, moveSquareInDirection(toSq, -westCaptureDirection), toSq);
         }
 
         while (eastCaptures) {
             Square toSq = bitboardToSquareWithReset(&eastCaptures);
-            setMove(moveList++, moveSquareInDirection(toSq, -eastCaptureDirection), toSq, CAPTURE);
+            setMove(moveList++, moveSquareInDirection(toSq, -eastCaptureDirection), toSq, QUIET);
         }
 
         while (westCaptures) {
             Square toSq = bitboardToSquareWithReset(&westCaptures);
-            setMove(moveList++, moveSquareInDirection(toSq, -westCaptureDirection), toSq, CAPTURE);
+            setMove(moveList++, moveSquareInDirection(toSq, -westCaptureDirection), toSq, QUIET);
         }
 
         if (board->enPassant != NO_SQUARE) {
@@ -159,11 +151,7 @@ MoveObject* generatePawnMoves(const ChessBoard *board, MoveObject *moveList, Bit
 
         while (promotions) {
             Square toSq = bitboardToSquareWithReset(&promotions);
-            Square fromSq = moveSquareInDirection(toSq, -pawnPush);
-            setMove(moveList++, fromSq, toSq, QUEEN_PROMOTION );
-            setMove(moveList++, fromSq, toSq, ROOK_PROMOTION  );
-            setMove(moveList++, fromSq, toSq, BISHOP_PROMOTION);
-            setMove(moveList++, fromSq, toSq, KNIGHT_PROMOTION);
+            moveList = generatePromotions(moveList, moveSquareInDirection(toSq, -pawnPush), toSq);
         }
 
         while (pawnsAbleToPush) {
@@ -179,18 +167,13 @@ MoveObject* generatePawnMoves(const ChessBoard *board, MoveObject *moveList, Bit
     return moveList;
 }
 
-MoveObject* generateNonPawnMoves(const ChessBoard *board, MoveObject *moveList, Bitboard validSquares, PieceType pt) {
+MoveObject* generatePieceMoves(const ChessBoard *board, MoveObject *moveList, Bitboard validSquares, PieceType pt) {
     Bitboard stmPieces = getPieces(board, board->sideToMove, pt);
-    Bitboard enemyPieces = getPieces(board, board->sideToMove ^ 1, ALL_PIECES);
-    Bitboard occupied = getPieces(board, board->sideToMove, ALL_PIECES) | enemyPieces;
+    Bitboard occupied = getOccupiedSquares(board);
     while (stmPieces) {
         Square fromSq = bitboardToSquareWithReset(&stmPieces);
         Bitboard validAttacks = getAttacks(pt, occupied, fromSq) & validSquares;
-        Bitboard captures = validAttacks & enemyPieces;
-        Bitboard quiets = validAttacks ^ captures;
-        
-        while (captures) setMove(moveList++, fromSq, bitboardToSquareWithReset(&captures), CAPTURE);
-        while (quiets) setMove(moveList++, fromSq, bitboardToSquareWithReset(&quiets), QUIET);
+        while (validAttacks) setMove(moveList++, fromSq, bitboardToSquareWithReset(&validAttacks), QUIET);
     }
     return moveList;
 }
