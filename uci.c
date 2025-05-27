@@ -1,8 +1,9 @@
+#include <stdint.h>
+#include <time.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include "uci.h"
-#include "benchmark.h"
 #include "chess_board.h"
 #include "move_generator.h"
 #include "utility.h"
@@ -18,6 +19,49 @@ static const char *benchmark = "benchmark";
 static const char *position  = "position";
 static const char *go        = "go";
 static const char *setoption = "setoption";
+
+static uint64_t perft(ChessBoard *restrict board, Depth depth) {
+    uint64_t nodes = 0;
+    IrreversibleBoardState ibs;
+    MoveObject moveList[256];
+    MoveObject *endList = createMoveList(board, moveList, CAPTURES);
+    endList = createMoveList(board, endList, NON_CAPTURES);
+    if (depth == 1)
+        for (MoveObject *moveObj = moveList; moveObj != endList; moveObj++) 
+            nodes += isLegalMove(board, &moveObj->move);
+    else 
+        for (MoveObject *moveObj = moveList; moveObj != endList; moveObj++) {
+            const Move *move = &moveObj->move;
+            if (!isLegalMove(board, move)) continue;
+            makeMove(board, move, &ibs);
+            nodes += perft(board, depth - 1);
+            undoMove(board, move, &ibs);
+        }
+    return nodes;
+}
+
+static void runBenchmark(Depth depth) {
+    FILE *perftFile = fopen("perft_test_cases.txt", "r");
+    char line[256];
+
+    double totalTime = 0.001; // TODO: Non ideal way to guard divide by 0 below
+    uint64_t actualNodes = 0, expectedNodes = 0;
+    while (fgets(line, sizeof(line), perftFile)) {
+        ChessBoard board = {0};
+        parseFEN(&board, strtok(line, ","));
+
+        clock_t start = clock(); // TODO: Consider a more accurate clock
+        actualNodes += perft(&board, depth);
+        totalTime += (double) (clock() - start) / CLOCKS_PER_SEC;
+        
+        for (int i = 0; i < depth - 1; i++) strtok(NULL, ",");
+        expectedNodes += strtoull(strtok(NULL, ","), NULL, 10);
+    }
+
+    printf("info string BENCHMARK %s\n", actualNodes == expectedNodes ? "PASSED" : "FAILED");
+    printf("info depth %d time %.0lf nodes %llu nps %.0lf\n", depth, totalTime * 1000.0, actualNodes, actualNodes / totalTime);
+    fclose(perftFile);
+}
 
 void uciLoop() {
     ChessBoard board;
@@ -91,12 +135,12 @@ void processMoves(ChessBoard *board) {
     char *moveStr;
     while ((moveStr = strtok(NULL, " ")) != NULL) {
         MoveObject moveList[MAX_MOVES];
-        MoveObject *endList = createMoveList(board, moveList);
+        MoveObject *endList = createMoveList(board, moveList, CAPTURES); // TODO
         char moveToName[6] = "";
         for (MoveObject *startList = moveList; startList < endList; startList++) {
-            MoveType moveType = getMoveType(&startList->move);
+            MoveType moveType = getMoveType(startList->move);
             char promotionPiece = moveType & PROMOTION ? PROMOTION_NAME[moveType & PROMOTION_PIECE_OFFSET_MASK] : '\0';
-            encodeChessMove(moveToName, SQUARE_NAME[getFromSquare(&startList->move)], SQUARE_NAME[getToSquare(&startList->move)], promotionPiece);
+            encodeChessMove(moveToName, SQUARE_NAME[getFromSquare(startList->move)], SQUARE_NAME[getToSquare(startList->move)], promotionPiece);
             if (strcmp(moveStr, moveToName) == 0) {
                 IrreversibleBoardState ibs;
                 makeMove(board, &startList->move, &ibs);
