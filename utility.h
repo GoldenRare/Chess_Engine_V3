@@ -1,39 +1,16 @@
 #ifndef UTILITY_H
 #define UTILITY_H
 
-#define A8_BB 0x8000000000000000ULL
-#define ENTIRE_BOARD 0xFFFFFFFFFFFFFFFFULL
-
-#define RANK_1_BB 0x00000000000000FFULL
-#define RANK_2_BB 0x000000000000FF00ULL
-#define RANK_3_BB 0x0000000000FF0000ULL
-#define RANK_4_BB 0x00000000FF000000ULL
-#define RANK_5_BB 0x000000FF00000000ULL
-#define RANK_6_BB 0x0000FF0000000000ULL
-#define RANK_7_BB 0x00FF000000000000ULL
-#define RANK_8_BB 0xFF00000000000000ULL
-
-#define FILE_A_BB 0x8080808080808080ULL
-#define FILE_B_BB 0x4040404040404040ULL
-#define FILE_C_BB 0x2020202020202020ULL
-#define FILE_D_BB 0x1010101010101010ULL
-#define FILE_E_BB 0x0808080808080808ULL
-#define FILE_F_BB 0x0404040404040404ULL
-#define FILE_G_BB 0x0202020202020202ULL
-#define FILE_H_BB 0x0101010101010101ULL
-
-#define NO_MOVE 0
-
 #include <stdint.h>
-#include <stdbool.h>
 #include <immintrin.h>
 
 typedef uint64_t Bitboard;
 typedef uint64_t Key;
 typedef uint16_t Move;
+typedef int Depth;
 
 enum PieceType {
-    PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING, ALL_PIECES, PIECE_TYPES, NO_PIECE,
+    NO_PIECE, PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING, ALL_PIECES, PIECE_TYPES,
     COLOUR_OFFSET = 6
 };
 typedef enum PieceType PieceType;
@@ -63,9 +40,8 @@ enum Square {
 typedef enum Square Square;
 
 enum MoveType {
-    QUIET, DOUBLE_PAWN_PUSH, KINGSIDE_CASTLE, QUEENSIDE_CASTLE, CAPTURE, EN_PASSANT_CAPTURE, 
-    PROMOTION = 8, KNIGHT_PROMOTION = 8, BISHOP_PROMOTION, ROOK_PROMOTION, QUEEN_PROMOTION, 
-    KNIGHT_PROMOTION_CAPTURE, BISHOP_PROMOTION_CAPTURE, ROOK_PROMOTION_CAPTURE, QUEEN_PROMOTION_CAPTURE,
+    QUIET, DOUBLE_PAWN_PUSH, CASTLE, EN_PASSANT_CAPTURE = 4,
+    PROMOTION = 8, KNIGHT_PROMOTION = 8, BISHOP_PROMOTION, ROOK_PROMOTION, QUEEN_PROMOTION,
     PROMOTION_PIECE_OFFSET_MASK = 3
 };
 typedef enum MoveType MoveType;
@@ -100,6 +76,20 @@ enum Bound {
     UPPER, LOWER, EXACT
 };
 typedef enum Bound Bound;
+
+constexpr Bitboard RANK_1_BB = 0x00000000000000FFULL;
+constexpr Bitboard RANK_2_BB = RANK_1_BB << NORTH;
+constexpr Bitboard RANK_4_BB = RANK_2_BB << NORTH * 2;
+constexpr Bitboard RANK_5_BB = RANK_4_BB << NORTH;
+constexpr Bitboard RANK_7_BB = RANK_5_BB << NORTH * 2;
+constexpr Bitboard RANK_8_BB = RANK_7_BB << NORTH;
+
+constexpr Bitboard FILE_A_BB = 0x8080808080808080ULL;
+constexpr Bitboard FILE_B_BB = FILE_A_BB >> -EAST;
+constexpr Bitboard FILE_G_BB = FILE_B_BB >> -EAST * 5;
+constexpr Bitboard FILE_H_BB = FILE_G_BB >> -EAST;
+
+constexpr Bitboard A8_BB = FILE_A_BB & RANK_8_BB;
 
 typedef struct MoveObject {
     Move move;
@@ -155,16 +145,16 @@ inline void setMove(MoveObject *move, Square fromSquare, Square toSquare, MoveTy
     move->move = moveType << 12 | toSquare << 6 | fromSquare;
 }
 
-inline Square getFromSquare(const Move *move) {
-    return *move & 0x3F;
+inline Square getFromSquare(const Move move) {
+    return move & 0x3F;
 }
 
-inline Square getToSquare(const Move *move) {
-    return *move >> 6 & 0x3F;
+inline Square getToSquare(const Move move) {
+    return move >> 6 & 0x3F;
 }
 
-inline MoveType getMoveType(const Move *move) {
-    return *move >> 12;
+inline MoveType getMoveType(const Move move) {
+    return move >> 12;
 }
 
 inline int populationCount(Bitboard b) {
@@ -174,6 +164,12 @@ inline int populationCount(Bitboard b) {
 /* Parallel Bits Extract */
 inline uint64_t pext(uint64_t src, uint64_t mask) {
     return _pext_u64(src, mask);
+}
+
+// Random number generator derived from Stockfish, more precisely from Sebastiano Vigna (2014).
+inline uint64_t random64BitNumber(uint64_t *seed) {
+    *seed ^= *seed >> 12, *seed ^= *seed << 25, *seed ^= *seed >> 27;
+    return *seed * 2685821657736338717LL;
 }
 
 inline int max(int a, int b) {
@@ -194,5 +190,8 @@ inline bool isAdjacentSquare(Square fromSq, Square toSq) {
     int fileDistance = abs((int) squareToFile(toSq) - (int) squareToFile(fromSq));
     return max(rankDistance, fileDistance) == 1;
 }
+
+// TODO
+#define NO_MOVE 0
 
 #endif
