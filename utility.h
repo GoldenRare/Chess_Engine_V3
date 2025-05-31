@@ -7,26 +7,29 @@
 typedef uint64_t Bitboard;
 typedef uint64_t Key;
 typedef uint16_t Move;
-typedef int Depth;
 
-enum PieceType {
-    NO_PIECE, PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING, ALL_PIECES, PIECE_TYPES,
-    COLOUR_OFFSET = 6
-};
-typedef enum PieceType PieceType;
+typedef int32_t Depth;
 
-enum Colour {
+typedef struct MoveObject {
+    Move move;
+    uint16_t score;
+} MoveObject;
+
+typedef enum PieceType {
+    NO_PIECE, PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING, PIECE_TYPES,
+    ALL_PIECES = 0, COLOUR_OFFSET = 6
+} PieceType;
+
+typedef enum Colour {
     WHITE, BLACK, COLOURS
-};
-typedef enum Colour Colour;
+} Colour;
 
-enum Direction {
+typedef enum Direction {
     NORTH = 8, SOUTH = -8, EAST = -1, WEST = 1,
     NORTH_EAST = 7, NORTH_WEST = 9, SOUTH_EAST = -9, SOUTH_WEST = -7
-};
-typedef enum Direction Direction;
+} Direction;
 
-enum Square {
+typedef enum Square {
     A8, B8, C8, D8, E8, F8, G8, H8,
     A7, B7, C7, D7, E7, F7, G7, H7,
     A6, B6, C6, D6, E6, F6, G6, H6,
@@ -36,27 +39,23 @@ enum Square {
     A2, B2, C2, D2, E2, F2, G2, H2,
     A1, B1, C1, D1, E1, F1, G1, H1,
     SQUARES, NO_SQUARE
-};
-typedef enum Square Square;
+} Square;
 
-enum MoveType {
+typedef enum MoveType {
     QUIET, DOUBLE_PAWN_PUSH, CASTLE, EN_PASSANT_CAPTURE = 4,
     PROMOTION = 8, KNIGHT_PROMOTION = 8, BISHOP_PROMOTION, ROOK_PROMOTION, QUEEN_PROMOTION,
     PROMOTION_PIECE_OFFSET_MASK = 3
-};
-typedef enum MoveType MoveType;
+} MoveType;
 
-enum Rank {
+typedef enum Rank {
     RANK_1, RANK_2, RANK_3, RANK_4, RANK_5, RANK_6, RANK_7, RANK_8, RANKS
-};
-typedef enum Rank Rank;
+} Rank;
 
-enum File {
+typedef enum File {
     FILE_A, FILE_B, FILE_C, FILE_D, FILE_E, FILE_F, FILE_G, FILE_H, FILES
-};
-typedef enum File File;
+} File;
 
-enum CastlingRights {
+typedef enum CastlingRights {
     WHITE_KINGSIDE = 1, WHITE_QUEENSIDE = 2, BLACK_KINGSIDE = 4, BLACK_QUEENSIDE = 8,
     WHITE_RIGHTS = WHITE_KINGSIDE | WHITE_QUEENSIDE,
     BLACK_RIGHTS = BLACK_KINGSIDE | BLACK_QUEENSIDE,
@@ -64,18 +63,15 @@ enum CastlingRights {
     QUEENSIDE = WHITE_QUEENSIDE | BLACK_QUEENSIDE,
     ALL_RIGHTS = WHITE_RIGHTS | BLACK_RIGHTS,
     CASTLING_SIDES = 2
-};
-typedef enum CastlingRights CastlingRights;
+} CastlingRights;
 
-enum Value {
-    CHECKMATED = -32000, DRAW = 0, INFINITE = 32700 // Temporary
-};
-typedef enum Value Value;
+typedef enum Value {
+    CHECKMATED = -32000, DRAW = 0, INFINITE = 32700 // TODO
+} Value;
 
-enum Bound {
+typedef enum Bound {
     UPPER, LOWER, EXACT
-};
-typedef enum Bound Bound;
+} Bound;
 
 constexpr Bitboard RANK_1_BB = 0x00000000000000FFULL;
 constexpr Bitboard RANK_2_BB = RANK_1_BB << NORTH;
@@ -90,11 +86,6 @@ constexpr Bitboard FILE_G_BB = FILE_B_BB >> -EAST * 5;
 constexpr Bitboard FILE_H_BB = FILE_G_BB >> -EAST;
 
 constexpr Bitboard A8_BB = FILE_A_BB & RANK_8_BB;
-
-typedef struct MoveObject {
-    Move move;
-    uint16_t score;
-} MoveObject;
 
 inline Rank squareToRank(Square sq) {
     return RANK_8 - (sq >> 3);
