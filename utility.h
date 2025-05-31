@@ -87,87 +87,87 @@ constexpr Bitboard FILE_H_BB = FILE_G_BB >> -EAST;
 
 constexpr Bitboard A8_BB = FILE_A_BB & RANK_8_BB;
 
-inline Rank squareToRank(Square sq) {
+static inline Rank squareToRank(Square sq) {
     return RANK_8 - (sq >> 3);
 }
 
-inline File squareToFile(Square sq) {
+static inline File squareToFile(Square sq) {
     return sq & 7;
 }
 
-inline Bitboard rankBitboardOfSquare(Square sq) {
+static inline Bitboard rankBitboardOfSquare(Square sq) {
     return RANK_1_BB << squareToRank(sq) * NORTH;
 }
 
-inline Bitboard fileBitboardOfSquare(Square sq) {
+static inline Bitboard fileBitboardOfSquare(Square sq) {
     return FILE_A_BB >> squareToFile(sq);
 }
 
-inline Bitboard squareToBitboard(Square sq) {
+static inline Bitboard squareToBitboard(Square sq) {
     return A8_BB >> sq;
 }
 
-inline Square moveSquareInDirection(Square sq, Direction d) {
+static inline Square moveSquareInDirection(Square sq, Direction d) {
     return sq - d;
 } 
 
-inline Bitboard shiftBitboard(Bitboard b, Direction d) {
+static inline Bitboard shiftBitboard(Bitboard b, Direction d) {
     return d > 0 ? b << d : b >> -d;
 }
 
 /* If multiple bits are set, returns square of Most Significant Bit. Undefined for b == 0. */
-inline Square bitboardToSquareMSB(Bitboard b) {
+static inline Square bitboardToSquareMSB(Bitboard b) {
     return __builtin_clzll(b);
 }
 
 /* If multiple bits are set, returns square of Least Significant Bit. Undefined for b == 0. */
-inline Square bitboardToSquare(Bitboard b) {
+static inline Square bitboardToSquare(Bitboard b) {
     return H1 - __builtin_ctzll(b);
 }
 
 /* If multiple bits are set, returns square of Least Significant Bit and removes the LSB from pointer. Undefined for b == 0. */
-inline Square bitboardToSquareWithReset(Bitboard *b) {
+static inline Square bitboardToSquareWithReset(Bitboard *b) {
     Square sq = H1 - __builtin_ctzll(*b);
     *b = _blsr_u64(*b);
     return sq;
 }
 
-inline void setMove(MoveObject *move, Square fromSquare, Square toSquare, MoveType moveType) {
+static inline void setMove(MoveObject *move, Square fromSquare, Square toSquare, MoveType moveType) {
     move->move = moveType << 12 | toSquare << 6 | fromSquare;
 }
 
-inline Square getFromSquare(const Move move) {
+static inline Square getFromSquare(const Move move) {
     return move & 0x3F;
 }
 
-inline Square getToSquare(const Move move) {
+static inline Square getToSquare(const Move move) {
     return move >> 6 & 0x3F;
 }
 
-inline MoveType getMoveType(const Move move) {
+static inline MoveType getMoveType(const Move move) {
     return move >> 12;
 }
 
-inline int populationCount(Bitboard b) {
+static inline int populationCount(Bitboard b) {
     return __builtin_popcountll(b);
 }
 
 /* Parallel Bits Extract */
-inline uint64_t pext(uint64_t src, uint64_t mask) {
+static inline uint64_t pext(uint64_t src, uint64_t mask) {
     return _pext_u64(src, mask);
 }
 
 // Random number generator derived from Stockfish, more precisely from Sebastiano Vigna (2014).
-inline uint64_t random64BitNumber(uint64_t *seed) {
+static inline uint64_t random64BitNumber(uint64_t *seed) {
     *seed ^= *seed >> 12, *seed ^= *seed << 25, *seed ^= *seed >> 27;
     return *seed * 2685821657736338717LL;
 }
 
-inline int max(int a, int b) {
+static inline int max(int a, int b) {
     return a >= b ? a : b;
 }
 
-inline void encodeChessMove(char *destination, const char *fromSquare, const char *toSquare, const char promotionPiece) {
+static inline void encodeChessMove(char *destination, const char *fromSquare, const char *toSquare, const char promotionPiece) {
     destination[0] = fromSquare[0];
     destination[1] = fromSquare[1];
     destination[2] = toSquare[0];
@@ -176,7 +176,7 @@ inline void encodeChessMove(char *destination, const char *fromSquare, const cha
     destination[5] = '\0';
 }
 
-inline bool isAdjacentSquare(Square fromSq, Square toSq) {
+static inline bool isAdjacentSquare(Square fromSq, Square toSq) {
     int rankDistance = abs((int) squareToRank(toSq) - (int) squareToRank(fromSq));
     int fileDistance = abs((int) squareToFile(toSq) - (int) squareToFile(fromSq));
     return max(rankDistance, fileDistance) == 1;
