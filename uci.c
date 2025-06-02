@@ -20,6 +20,17 @@ static const char *position  = "position";
 static const char *go        = "go";
 static const char *setoption = "setoption";
 
+static void processUCICommand() {
+    puts("id name GoldenRareBOT V3");
+    puts("id author Deshawn Mohan");
+    // TODO: List options
+    puts("uciok");
+}
+
+static void processIsReadyCommand() {
+    puts("readyok");
+}
+
 static uint64_t perft(ChessBoard *restrict board, Depth depth) {
     uint64_t nodes = 0;
     IrreversibleBoardState ibs;
@@ -87,16 +98,6 @@ void uciLoop() {
         while (tokenHelper != NULL) tokenHelper = strtok(NULL, " ");
     }
     
-}
-
-void processUCICommand() {
-    printf("id name GoldenRareBOT V3\n");
-    printf("id author Deshawn Mohan-Smith\n");
-    printf("uciok\n");
-}
-
-void processIsReadyCommand() {
-    printf("readyok\n");
 }
 
 void processBenchmarkCommand() {
