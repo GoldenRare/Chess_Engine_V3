@@ -42,8 +42,8 @@ typedef enum Square {
 } Square;
 
 typedef enum MoveType {
-    QUIET, DOUBLE_PAWN_PUSH, CASTLE, EN_PASSANT_CAPTURE = 4,
-    PROMOTION = 8, KNIGHT_PROMOTION = 8, BISHOP_PROMOTION, ROOK_PROMOTION, QUEEN_PROMOTION,
+    QUIET, DOUBLE_PAWN_PUSH, CASTLE, EN_PASSANT = 4, PROMOTION = 8,
+    KNIGHT_PROMOTION = 8, BISHOP_PROMOTION, ROOK_PROMOTION, QUEEN_PROMOTION,
     PROMOTION_PIECE_OFFSET_MASK = 3
 } MoveType;
 
@@ -86,6 +86,8 @@ constexpr Bitboard FILE_G_BB = FILE_B_BB >> -EAST * 5;
 constexpr Bitboard FILE_H_BB = FILE_G_BB >> -EAST;
 
 constexpr Bitboard A8_BB = FILE_A_BB & RANK_8_BB;
+
+constexpr Move NO_MOVE = 0;
 
 static inline Rank squareToRank(Square sq) {
     return RANK_8 - (sq >> 3);
@@ -136,15 +138,15 @@ static inline void setMove(MoveObject *move, Square fromSquare, Square toSquare,
     move->move = moveType << 12 | toSquare << 6 | fromSquare;
 }
 
-static inline Square getFromSquare(const Move move) {
+static inline Square getFromSquare(Move move) {
     return move & 0x3F;
 }
 
-static inline Square getToSquare(const Move move) {
+static inline Square getToSquare(Move move) {
     return move >> 6 & 0x3F;
 }
 
-static inline MoveType getMoveType(const Move move) {
+static inline MoveType getMoveType(Move move) {
     return move >> 12;
 }
 
@@ -181,8 +183,5 @@ static inline bool isAdjacentSquare(Square fromSq, Square toSq) {
     int fileDistance = abs((int) squareToFile(toSq) - (int) squareToFile(fromSq));
     return max(rankDistance, fileDistance) == 1;
 }
-
-// TODO
-#define NO_MOVE 0
 
 #endif

@@ -18,7 +18,7 @@ typedef struct MoveSelector {
     Move killers[2];
 } MoveSelector;
 
-inline void createMoveSelector(MoveSelector *ms, MoveSelectorState state, Move ttMove, Move *killers) {
+static inline void createMoveSelector(MoveSelector *restrict ms, MoveSelectorState state, Move ttMove, const Move *restrict killers) {
     ms->state = state;
     ms->ttMove = ttMove;
     ms->startList = ms->moveList;
@@ -33,8 +33,5 @@ inline void swap(MoveObject *mo1, MoveObject *mo2) {
 }
 
 Move getNextBestMove(const ChessBoard *board, MoveSelector *ms);
-Move getNextHighestScoringMove(MoveSelector *ms);
-
-void scoreMoves(const ChessBoard *board, MoveSelector *ms);
 
 #endif

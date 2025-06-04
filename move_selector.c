@@ -3,27 +3,26 @@
 #include "utility.h"
 #include "evaluation.h"
 
-Move getNextBestMove(const ChessBoard *board, MoveSelector *ms) {
-    while (true) {
-        switch (ms->state) {
-            case TT_MOVE:
-                ms->state++;
-                if (ms->ttMove && isPseudoMove(board, ms->ttMove)) return ms->ttMove;
-                break;
-            case ALL_MOVES_INIT:
-                ms->state++;
-                ms->endList = createMoveList(board, ms->moveList);
-                scoreMoves(board, ms);
-                break;
-            case ALL_MOVES:
-                return getNextHighestScoringMove(ms);
-            case TEMP:
-                return NO_MOVE;
+static void scoreMoves(const ChessBoard *restrict board, MoveSelector *restrict ms) {
+    MoveObject *startList = ms->startList;
+    while (startList < ms->endList) {
+        PieceType capturedPiece = board->pieceTypes[getToSquare(startList->move)];
+        if (capturedPiece) {
+            startList->score = PIECE_VALUE[capturedPiece] - board->pieceTypes[getFromSquare(startList->move)]; // MVV/LVA
+        } else if (getMoveType(startList->move) & EN_PASSANT) {
+            startList->score = 90;
+        } else if (startList->move == ms->killers[0]) {
+            startList->score = 51;
+        } else if (startList->move == ms->killers[1]) {
+            startList->score = 50;
+        } else {
+            startList->score = 0;
         }
+        startList++;
     }
 }
 
-Move getNextHighestScoringMove(MoveSelector *ms) {
+static Move getNextHighestScoringMove(MoveSelector *ms) {
     if (ms->startList->move == ms->ttMove) ms->startList++; // TODO: Test getting rid of this check, and simply just restarting another search
     if (ms->startList >= ms->endList) return NO_MOVE;
 
@@ -37,20 +36,23 @@ Move getNextHighestScoringMove(MoveSelector *ms) {
     return ms->startList++->move; 
 }
 
-void scoreMoves(const ChessBoard *board, MoveSelector *ms) {
-    MoveObject *startList = ms->startList;
-    while (startList < ms->endList) {
-        MoveType moveType = getMoveType(&startList->move);
-        if (moveType & CAPTURE) {
-            startList->score = moveType == EN_PASSANT_CAPTURE ? 90 
-                             : PIECE_VALUE[board->pieceTypes[getToSquare(&startList->move)]] - board->pieceTypes[getFromSquare(&startList->move)];
-        } else if (startList->move == ms->killers[0]) {
-            startList->score = 51;
-        } else if (startList->move == ms->killers[1]) {
-            startList->score = 50;
-        } else {
-            startList->score = 0;
+Move getNextBestMove(const ChessBoard *restrict board, MoveSelector *restrict ms) {
+    while (true) {
+        switch (ms->state) {
+            case TT_MOVE:
+                ms->state++;
+                if (isPseudoMove(board, ms->ttMove)) return ms->ttMove;
+                break;
+            case ALL_MOVES_INIT:
+                ms->state++;
+                ms->endList = createMoveList(board, ms->moveList, CAPTURES);
+                ms->endList = createMoveList(board, ms->endList, NON_CAPTURES);
+                scoreMoves(board, ms);
+                break;
+            case ALL_MOVES:
+                return getNextHighestScoringMove(ms);
+            case TEMP:
+                return NO_MOVE;
         }
-        startList++;
     }
 }
