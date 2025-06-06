@@ -3,6 +3,12 @@
 #include "utility.h"
 #include "evaluation.h"
 
+static inline void swap(MoveObject *mo1, MoveObject *mo2) {
+    MoveObject temp = *mo1;
+    *mo1 = *mo2;
+    *mo2 = temp;
+}
+
 static void scoreMoves(const ChessBoard *restrict board, MoveSelector *restrict ms) {
     MoveObject *startList = ms->startList;
     while (startList < ms->endList) {
@@ -41,17 +47,26 @@ Move getNextBestMove(const ChessBoard *restrict board, MoveSelector *restrict ms
         switch (ms->state) {
             case TT_MOVE:
                 ms->state++;
-                if (isPseudoMove(board, ms->ttMove)) return ms->ttMove;
-                break;
-            case ALL_MOVES_INIT:
+                return ms->ttMove;
+            case CAPTURE_MOVES:
                 ms->state++;
                 ms->endList = createMoveList(board, ms->moveList, CAPTURES);
+                scoreMoves(board, ms);
+                break;
+            case GET_CAPTURES:
+                Move m;
+                if ((m = getNextHighestScoringMove(ms))) return m;
+                ms->state++;
+                break;
+            case NON_CAPTURE_MOVES:
+                ms->state++;
                 ms->endList = createMoveList(board, ms->endList, NON_CAPTURES);
                 scoreMoves(board, ms);
                 break;
-            case ALL_MOVES:
+            case GET_NON_CAPTURE_MOVES:
                 return getNextHighestScoringMove(ms);
             case TEMP:
+            default:
                 return NO_MOVE;
         }
     }
