@@ -9,6 +9,7 @@ typedef uint64_t Key;
 typedef uint16_t Move;
 
 typedef int32_t Depth;
+typedef int32_t Score;
 
 typedef struct MoveObject {
     Move move;
