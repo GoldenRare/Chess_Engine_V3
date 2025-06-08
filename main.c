@@ -1,12 +1,12 @@
 #include "move_generator.h"
 #include "chess_board.h"
 #include "uci.h"
-#include "zobrist.h"
+#include "nnue.h"
 
 int main () {
     initializeMoveGenerator();
     initializeChessBoard();
-    initializeZobrist();
+    initializeNNUE();
     uciLoop();
     return 0;
 }
