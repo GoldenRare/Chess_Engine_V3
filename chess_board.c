@@ -1,10 +1,19 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include <stdbool.h>
+#include <stdint.h>
 #include "chess_board.h"
 #include "utility.h"
 #include "move_generator.h"
-#include "zobrist.h"
+#include "nnue.h"
+
+typedef struct Zobrist {
+    uint64_t pieceOnSquare[PIECE_TYPES * COLOURS][SQUARES]; // TODO: Some unnecessary space due to NO_PIECE
+    uint64_t castlingRights[ALL_RIGHTS + 1]; // +1 to include ALL_RIGHTS
+    uint64_t enPassant[FILES];
+    uint64_t sideToMove;
+} Zobrist;
+
+static Zobrist zobristHashes;
 
 Bitboard fullLine[SQUARES][SQUARES];
 Bitboard inBetweenLine[SQUARES][SQUARES];
@@ -33,7 +42,93 @@ static const CastlingRights CASTLING_RIGHTS_MASK[SQUARES] = {
     [A8] = BLACK_KINGSIDE | WHITE_RIGHTS, [B8] = ALL_RIGHTS, [C8] = ALL_RIGHTS, [D8] = ALL_RIGHTS, [E8] = WHITE_RIGHTS, [F8] = ALL_RIGHTS, [G8] = ALL_RIGHTS, [H8] = BLACK_QUEENSIDE | WHITE_RIGHTS,
 };
 
+static void initializeZobrist() {
+    uint64_t seed = 1070372;
+    for (PieceType pt = PAWN; pt < PIECE_TYPES; pt++) {
+        for (Square sq = 0; sq < SQUARES; sq++) {
+            zobristHashes.pieceOnSquare[pt][sq] = random64BitNumber(&seed);
+            zobristHashes.pieceOnSquare[pt + COLOUR_OFFSET][sq] = random64BitNumber(&seed);
+        }
+    }
+
+    for (CastlingRights cr = 0; cr < ALL_RIGHTS + 1; cr++) {
+        zobristHashes.castlingRights[cr] = random64BitNumber(&seed);
+    }
+
+    for (File file = FILE_A; file < FILES; file++) {
+        zobristHashes.enPassant[file] = random64BitNumber(&seed);
+    }
+
+    zobristHashes.sideToMove = random64BitNumber(&seed);
+}
+
+// TODO: Make inline after accumulator optimizations are done
+static void addPiece(ChessBoard *restrict board, Colour c, PieceType pt, Square sq) {
+    Bitboard sqBB = squareToBitboard(sq);
+    board->pieceTypes[sq] = pt;
+    board->pieces[c][pt] |= sqBB;
+    board->pieces[c][ALL_PIECES] |= sqBB;
+    accumulatorAdd(c, pt, sq);
+}
+
+// TODO: Make inline after accumulator optimizations are done
+static void movePiece(ChessBoard *restrict board, Colour c, PieceType pt, Square fromSquare, Square toSquare) {
+    Bitboard fromToBB = squareToBitboard(fromSquare) | squareToBitboard(toSquare);
+    board->pieceTypes[toSquare] = pt;
+    board->pieceTypes[fromSquare] = NO_PIECE;
+    board->pieces[c][pt] ^= fromToBB;
+    board->pieces[c][ALL_PIECES] ^= fromToBB;
+    accumulatorAddSub(c, pt, fromSquare, toSquare);
+}
+
+// TODO: Make inline after accumulator optimizations are done
+static void removePiece(ChessBoard *restrict board, Colour c, PieceType pt, Square sq) {
+    Bitboard sqBB = squareToBitboard(sq);
+    board->pieceTypes[sq] = NO_PIECE;
+    board->pieces[c][pt] ^= sqBB;
+    board->pieces[c][ALL_PIECES] ^= sqBB;
+    accumulatorSub(c, pt, sq);
+}
+
+static Bitboard getPinnedPieces(const ChessBoard *restrict board) {
+    Colour stm = board->sideToMove;
+    Colour enemy = stm ^ 1;
+    Square kingSq = getKingSquare(board, stm);
+    Bitboard enemyQueens = getPieces(board, enemy, QUEEN);
+    Bitboard stmPieces = getPieces(board, stm, ALL_PIECES);
+    Bitboard occupiedSquares = stmPieces | getPieces(board, enemy, ALL_PIECES);
+
+    Bitboard attacks = getSlidingAttacks(occupiedSquares, kingSq, ROOK_INDEX);
+    Bitboard potentiallyPinned = attacks & stmPieces;
+    Bitboard pinners = (getSlidingAttacks(occupiedSquares ^ potentiallyPinned, kingSq, ROOK_INDEX) ^ attacks) & (getPieces(board, enemy, ROOK) | enemyQueens);
+
+    Bitboard pinned = 0ULL;
+    while (pinners) {
+        pinned |= inBetweenLine[bitboardToSquareWithReset(&pinners)][kingSq] & potentiallyPinned;
+    }
+
+    attacks = getSlidingAttacks(occupiedSquares, kingSq, BISHOP_INDEX);
+    potentiallyPinned = attacks & stmPieces;
+    pinners = (getSlidingAttacks(occupiedSquares ^ potentiallyPinned, kingSq, BISHOP_INDEX) ^ attacks) & (getPieces(board, enemy, BISHOP) | enemyQueens);
+    while (pinners) {
+        pinned |= inBetweenLine[bitboardToSquareWithReset(&pinners)][kingSq] & potentiallyPinned;
+    }
+
+    return pinned;
+}
+
+static Bitboard attackersTo(const ChessBoard *restrict board, Square sq, Colour attackedSide, Bitboard occupied) {
+    Colour enemy = attackedSide ^ 1;
+    Bitboard queens = getPieces(board, enemy, QUEEN);
+    return (getPawnAttacks(attackedSide, sq)              &  getPieces(board, enemy, PAWN))
+         | (getNonSlidingAttacks(KNIGHT_ATTACKER, sq)     &  getPieces(board, enemy, KNIGHT))
+         | (getSlidingAttacks(occupied, sq, BISHOP_INDEX) & (getPieces(board, enemy, BISHOP) | queens))
+         | (getSlidingAttacks(occupied, sq, ROOK_INDEX)   & (getPieces(board, enemy, ROOK)   | queens))
+         | (getNonSlidingAttacks(KING_ATTACKER, sq)       &  getPieces(board, enemy, KING));
+}
+
 void initializeChessBoard() {
+    initializeZobrist();
     for (Square sq1 = 0; sq1 < SQUARES; sq1++) {
         int sq1Rank = squareToRank(sq1);
         int sq1File = squareToFile(sq1);
@@ -47,13 +142,13 @@ void initializeChessBoard() {
             int rankDistance = abs((int) squareToRank(sq2) - sq1Rank);
             int fileDistance = abs((int) squareToFile(sq2) - sq1File);
             Bitboard line = 0;
-            Bitboard inBetween = 0;
+            Bitboard inBetween = sq1BB | sq2BB;
             if (rankDistance == 0 || fileDistance == 0) {
                 line = rankDistance == 0 ? rankBB : fileBB;
-                inBetween = (getSlidingAttacks(sq2BB, sq1, ROOK_INDEX) & getSlidingAttacks(sq1BB, sq2, ROOK_INDEX)) | sq1BB | sq2BB;
+                inBetween |= (getSlidingAttacks(sq2BB, sq1, ROOK_INDEX) & getSlidingAttacks(sq1BB, sq2, ROOK_INDEX));
             } else if (rankDistance == fileDistance) {
                 line = (sq1BishopAttacks & getSlidingAttacks(0, sq2, BISHOP_INDEX)) | sq1BB | sq2BB;
-                inBetween = (getSlidingAttacks(sq2BB, sq1, BISHOP_INDEX) & getSlidingAttacks(sq1BB, sq2, BISHOP_INDEX)) | sq1BB | sq2BB;  
+                inBetween |= (getSlidingAttacks(sq2BB, sq1, BISHOP_INDEX) & getSlidingAttacks(sq1BB, sq2, BISHOP_INDEX));  
             }
             fullLine[sq1][sq2] = line;
             fullLine[sq2][sq1] = line;
@@ -63,7 +158,7 @@ void initializeChessBoard() {
     }
 }
 
-void parseFEN(ChessBoard *board, const char *fenString) {
+void parseFEN(ChessBoard *restrict board, const char *restrict fenString) {
     static const Colour CHAR_TO_COLOUR[128] = {
         ['P'] = WHITE, ['p'] = BLACK, 
         ['N'] = WHITE, ['n'] = BLACK, 
@@ -120,66 +215,47 @@ void parseFEN(ChessBoard *board, const char *fenString) {
 
     /* 5) Miscellaneous Data */
     board->checkers = attackersTo(board, getKingSquare(board, board->sideToMove), board->sideToMove, getOccupiedSquares(board));
+    board->pinnedPieces = getPinnedPieces(board);
 }
 
-void addPiece(ChessBoard *board, Colour c, PieceType pt, Square sq) {
-    Bitboard sqBB = squareToBitboard(sq);
-    board->pieceTypes[sq] = pt;
-    board->pieces[c][pt] |= sqBB;
-    board->pieces[c][ALL_PIECES] |= sqBB;
-}
-
-void movePiece(ChessBoard *board, Colour c, PieceType pt, Square fromSquare, Square toSquare) {
-    Bitboard fromToBB = squareToBitboard(fromSquare) | squareToBitboard(toSquare);
-    board->pieceTypes[toSquare] = pt;
-    board->pieceTypes[fromSquare] = NO_PIECE;
-    board->pieces[c][pt] ^= fromToBB;
-    board->pieces[c][ALL_PIECES] ^= fromToBB;
-}
-
-void removePiece(ChessBoard *board, Colour c, PieceType pt, Square sq) {
-    Bitboard sqBB = squareToBitboard(sq);
-    board->pieceTypes[sq] = NO_PIECE;
-    board->pieces[c][pt] ^= sqBB;
-    board->pieces[c][ALL_PIECES] ^= sqBB;
-}
-
-void makeMove(ChessBoard *board, const Move *move, IrreversibleBoardState *ibs) {
+void makeMove(ChessBoard *restrict board, Move move, IrreversibleBoardState *restrict ibs) {
+    const size_t COL_OFFSET = COLOUR_OFFSET * board->sideToMove;
     Square fromSquare = getFromSquare(move);
     Square toSquare = getToSquare(move);
     MoveType moveType = getMoveType(move);
-    Colour stm = board->sideToMove;
+    Square captureSquare = moveType & EN_PASSANT ? moveSquareInDirection(toSquare, board->sideToMove ? NORTH : SOUTH) : toSquare;
+
+    ibs->capturedPiece = board->pieceTypes[captureSquare];
     ibs->positionKey = board->positionKey;
     ibs->checkers = board->checkers;
+    ibs->castlingRights = board->castlingRights;
+    ibs->enPassant = board->enPassant;
+    ibs->pinnedPieces = board->pinnedPieces;
     
-    if (moveType & CAPTURE) {
-        Square captureSquare = moveType == EN_PASSANT_CAPTURE ? moveSquareInDirection(toSquare, stm ? NORTH : SOUTH) : toSquare;
-        ibs->capturedPiece = board->pieceTypes[captureSquare];
-        removePiece(board, stm ^ 1, ibs->capturedPiece, captureSquare);
-        board->positionKey ^= zobristHashes.pieceOnSquare[ibs->capturedPiece + COLOUR_OFFSET * (stm ^ 1)][captureSquare];
-    } else if (moveType == KINGSIDE_CASTLE || moveType == QUEENSIDE_CASTLE) {
-        bool isQueenSideCastle = moveType & 1;
-        Square rookFromSquare = isQueenSideCastle ? moveSquareInDirection(toSquare, WEST + WEST) : moveSquareInDirection(toSquare, EAST);
-        Square rookToSquare   = isQueenSideCastle ? moveSquareInDirection(fromSquare, WEST)      : moveSquareInDirection(fromSquare, EAST);
-        movePiece(board, stm, ROOK, rookFromSquare, rookToSquare);
-        board->positionKey ^= zobristHashes.pieceOnSquare[ROOK + COLOUR_OFFSET * stm][rookFromSquare] 
-                           ^  zobristHashes.pieceOnSquare[ROOK + COLOUR_OFFSET * stm][rookToSquare  ];
+    if (ibs->capturedPiece != NO_PIECE) {
+        removePiece(board, board->sideToMove ^ 1, ibs->capturedPiece, captureSquare);
+        board->positionKey ^= zobristHashes.pieceOnSquare[ibs->capturedPiece + COLOUR_OFFSET * (board->sideToMove ^ 1)][captureSquare];
+    } else if (moveType == CASTLE) {
+        bool isKingSideCastle = toSquare > fromSquare;
+        Square rookFromSquare = isKingSideCastle ? moveSquareInDirection(toSquare  , EAST) : moveSquareInDirection(toSquare  , WEST + WEST);
+        Square rookToSquare   = isKingSideCastle ? moveSquareInDirection(fromSquare, EAST) : moveSquareInDirection(fromSquare, WEST       );
+        movePiece(board, board->sideToMove, ROOK, rookFromSquare, rookToSquare);
+        board->positionKey ^= zobristHashes.pieceOnSquare[ROOK + COL_OFFSET][rookFromSquare] 
+                           ^  zobristHashes.pieceOnSquare[ROOK + COL_OFFSET][rookToSquare  ];
     } 
     
     if (moveType & PROMOTION) {
         PieceType pt = KNIGHT + (moveType & PROMOTION_PIECE_OFFSET_MASK);
-        addPiece(board, stm, pt, toSquare);
-        board->positionKey ^= zobristHashes.pieceOnSquare[pt + COLOUR_OFFSET * stm][toSquare];
-        removePiece(board, stm, PAWN, fromSquare);
-        board->positionKey ^= zobristHashes.pieceOnSquare[PAWN + COLOUR_OFFSET * stm][fromSquare];
+        addPiece(board, board->sideToMove, pt, toSquare);
+        board->positionKey ^= zobristHashes.pieceOnSquare[pt + COL_OFFSET][toSquare];
+        removePiece(board, board->sideToMove, PAWN, fromSquare);
+        board->positionKey ^= zobristHashes.pieceOnSquare[PAWN + COL_OFFSET][fromSquare];
     } else {
-        movePiece(board, stm, board->pieceTypes[fromSquare], fromSquare, toSquare);
-        board->positionKey ^= zobristHashes.pieceOnSquare[board->pieceTypes[fromSquare] + COLOUR_OFFSET * stm][fromSquare] 
-                           ^  zobristHashes.pieceOnSquare[board->pieceTypes[fromSquare] + COLOUR_OFFSET * stm][toSquare  ];
+        movePiece(board, board->sideToMove, board->pieceTypes[fromSquare], fromSquare, toSquare);
+        board->positionKey ^= zobristHashes.pieceOnSquare[board->pieceTypes[fromSquare] + COL_OFFSET][fromSquare] 
+                           ^  zobristHashes.pieceOnSquare[board->pieceTypes[fromSquare] + COL_OFFSET][toSquare  ];
     }
 
-    ibs->castlingRights = board->castlingRights;
-    ibs->enPassant = board->enPassant;
     if (board->enPassant != NO_SQUARE) board->positionKey ^= zobristHashes.enPassant[squareToFile(board->enPassant)];
     if (board->castlingRights) {
         board->positionKey ^= zobristHashes.castlingRights[board->castlingRights];
@@ -187,7 +263,7 @@ void makeMove(ChessBoard *board, const Move *move, IrreversibleBoardState *ibs) 
         board->positionKey ^= zobristHashes.castlingRights[board->castlingRights];
     } 
     if (moveType == DOUBLE_PAWN_PUSH) {
-        board->enPassant = moveSquareInDirection(toSquare, stm ? NORTH : SOUTH);
+        board->enPassant = moveSquareInDirection(toSquare, board->sideToMove ? NORTH : SOUTH);
         board->positionKey ^= zobristHashes.enPassant[squareToFile(board->enPassant)];
     } else {
         board->enPassant = NO_SQUARE;
@@ -195,14 +271,16 @@ void makeMove(ChessBoard *board, const Move *move, IrreversibleBoardState *ibs) 
     board->sideToMove ^= 1;
     board->positionKey ^= zobristHashes.sideToMove;
     board->checkers = attackersTo(board, getKingSquare(board, board->sideToMove), board->sideToMove, getOccupiedSquares(board));
+    board->pinnedPieces = getPinnedPieces(board);
 }
 
-void undoMove(ChessBoard *board, const Move *move, const IrreversibleBoardState *ibs) {
+void undoMove(ChessBoard *restrict board, Move move, const IrreversibleBoardState *restrict ibs) {
     board->positionKey = ibs->positionKey;
     board->sideToMove ^= 1;
     board->enPassant = ibs->enPassant;
     board->castlingRights = ibs->castlingRights;
     board->checkers = ibs->checkers;
+    board->pinnedPieces = ibs->pinnedPieces;
     
     Square fromSquare = getFromSquare(move);
     Square toSquare = getToSquare(move);
@@ -216,27 +294,25 @@ void undoMove(ChessBoard *board, const Move *move, const IrreversibleBoardState 
         movePiece(board, stm, board->pieceTypes[toSquare], toSquare, fromSquare);
     }
 
-    if (moveType & CAPTURE) {
-        bool isEnPassantCapture = moveType == EN_PASSANT_CAPTURE;
-        PieceType capturedPiece = ibs->capturedPiece;
-        Square captureSquare = isEnPassantCapture ? moveSquareInDirection(toSquare, stm ? NORTH : SOUTH) : toSquare;
-        addPiece(board, stm ^ 1, capturedPiece, captureSquare);
-    } else if (moveType == KINGSIDE_CASTLE || moveType == QUEENSIDE_CASTLE) {
-        bool isQueenSideCastle = moveType & 1;
-        Square rookFromSquare = isQueenSideCastle ? moveSquareInDirection(toSquare, WEST + WEST) : moveSquareInDirection(toSquare, EAST);
-        Square rookToSquare   = isQueenSideCastle ? moveSquareInDirection(fromSquare, WEST)      : moveSquareInDirection(fromSquare, EAST);
+    if (ibs->capturedPiece != NO_PIECE) {
+        Square captureSquare = moveType == EN_PASSANT ? moveSquareInDirection(toSquare, stm ? NORTH : SOUTH) : toSquare;
+        addPiece(board, stm ^ 1, ibs->capturedPiece, captureSquare);
+    } else if (moveType == CASTLE) {
+        bool isKingSideCastle = toSquare > fromSquare;
+        Square rookFromSquare = isKingSideCastle ? moveSquareInDirection(toSquare  , EAST) : moveSquareInDirection(toSquare  , WEST + WEST);
+        Square rookToSquare   = isKingSideCastle ? moveSquareInDirection(fromSquare, EAST) : moveSquareInDirection(fromSquare, WEST       );
         movePiece(board, stm, ROOK, rookToSquare, rookFromSquare);
     } 
 }
 
-bool isLegalMove(const ChessBoard *board, const Move *move, Bitboard pinned) {
+bool isLegalMove(const ChessBoard *restrict board, Move move) {
     Square fromSquare = getFromSquare(move);
     Square toSquare = getToSquare(move);
     MoveType moveType = getMoveType(move);
     Colour stm = board->sideToMove;
 
-    if (moveType == KINGSIDE_CASTLE || moveType == QUEENSIDE_CASTLE) {
-        Direction towardsKing = moveType & 1 ? EAST : WEST;
+    if (moveType == CASTLE) {
+        Direction towardsKing = toSquare > fromSquare ? WEST : EAST;
         Bitboard occupied = getOccupiedSquares(board);
         while (toSquare != fromSquare) {
             if (attackersTo(board, toSquare, stm, occupied)) return false;
@@ -247,7 +323,7 @@ bool isLegalMove(const ChessBoard *board, const Move *move, Bitboard pinned) {
 
     Square kingSquare = getKingSquare(board, stm);
     Bitboard fromSquareBB = squareToBitboard(fromSquare);
-    if (moveType == EN_PASSANT_CAPTURE) {
+    if (moveType == EN_PASSANT) {
         Bitboard occupied = getOccupiedSquares(board) ^ fromSquareBB ^ squareToBitboard(toSquare) 
                           ^ squareToBitboard(moveSquareInDirection(toSquare, stm ? NORTH : SOUTH));
         Colour enemy = stm ^ 1;
@@ -260,64 +336,17 @@ bool isLegalMove(const ChessBoard *board, const Move *move, Bitboard pinned) {
         return !attackersTo(board, toSquare, stm, getOccupiedSquares(board) ^ fromSquareBB);
     }
     
-    return !(pinned & fromSquareBB) || fullLine[fromSquare][toSquare] & squareToBitboard(kingSquare);
+    return !(board->pinnedPieces & fromSquareBB) || fullLine[fromSquare][toSquare] & squareToBitboard(kingSquare);
 }
 
-// TODO: Operation is currently expensive
-bool isPseudoMove(const ChessBoard *board, Move move) {
+bool isPseudoMove(const ChessBoard *restrict board, Move move) {
     MoveObject moveList[256];
     MoveObject *startList = moveList;
-    MoveObject *endList = createMoveList(board, moveList);
+    MoveObject *endList = createMoveList(board, moveList, CAPTURES);
+    endList = createMoveList(board, endList, NON_CAPTURES);
     while (startList < endList) {
         if (startList->move == move) return true;
         startList++;
     }
     return false;
-}
-
-Bitboard getPinnedPieces(const ChessBoard *board) {
-    Colour stm = board->sideToMove;
-    Colour enemy = stm ^ 1;
-    Square kingSq = getKingSquare(board, stm);
-    Bitboard enemyQueens = getPieces(board, enemy, QUEEN);
-    Bitboard stmPieces = getPieces(board, stm, ALL_PIECES);
-    Bitboard occupiedSquares = stmPieces | getPieces(board, enemy, ALL_PIECES);
-
-    Bitboard attacks = getSlidingAttacks(occupiedSquares, kingSq, ROOK_INDEX);
-    Bitboard potentiallyPinned = attacks & stmPieces;
-    Bitboard pinners = (getSlidingAttacks(occupiedSquares ^ potentiallyPinned, kingSq, ROOK_INDEX) ^ attacks) & (getPieces(board, enemy, ROOK) | enemyQueens);
-
-    Bitboard pinned = 0ULL;
-    while (pinners) {
-        pinned |= inBetweenLine[bitboardToSquareWithReset(&pinners)][kingSq] & potentiallyPinned;
-    }
-
-    attacks = getSlidingAttacks(occupiedSquares, kingSq, BISHOP_INDEX);
-    potentiallyPinned = attacks & stmPieces;
-    pinners = (getSlidingAttacks(occupiedSquares ^ potentiallyPinned, kingSq, BISHOP_INDEX) ^ attacks) & (getPieces(board, enemy, BISHOP) | enemyQueens);
-    while (pinners) {
-        pinned |= inBetweenLine[bitboardToSquareWithReset(&pinners)][kingSq] & potentiallyPinned;
-    }
-
-    return pinned;
-}
-
-Bitboard attackersTo(const ChessBoard *board, Square sq, Colour attackedSide, Bitboard occupied) {
-    Colour enemy = attackedSide ^ 1;
-    Bitboard queens = getPieces(board, enemy, QUEEN);
-    return (getPawnAttacks(attackedSide, sq)              &  getPieces(board, enemy, PAWN))
-         | (getNonSlidingAttacks(KNIGHT_ATTACKER, sq)     &  getPieces(board, enemy, KNIGHT))
-         | (getSlidingAttacks(occupied, sq, BISHOP_INDEX) & (getPieces(board, enemy, BISHOP) | queens))
-         | (getSlidingAttacks(occupied, sq, ROOK_INDEX)   & (getPieces(board, enemy, ROOK)   | queens))
-         | (getNonSlidingAttacks(KING_ATTACKER, sq)       &  getPieces(board, enemy, KING));
-}
-
-void printBitboard(Bitboard b) {
-    printf("_________________________________\n");
-    for (Bitboard i = 1ULL << 63; i > 0; i >>= 1) {
-        if (i & FILE_A_BB) printf("| ");
-        if (b & i) printf("1 | ");
-        else printf("0 | ");
-        if (i & FILE_H_BB) printf("\n_________________________________\n");
-    }
 }

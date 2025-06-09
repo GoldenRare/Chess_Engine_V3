@@ -1,13 +1,14 @@
 #ifndef CHESS_BOARD_H
 #define CHESS_BOARD_H
 
-#include <stdbool.h>
 #include "utility.h"
 
+// TODO: Revisit what is stored in the structs, primarily the pinned pieces
 typedef struct ChessBoard {
+    Bitboard pieces[COLOURS][PIECE_TYPES];
     Key positionKey;
     Bitboard checkers;
-    Bitboard pieces[COLOURS][PIECE_TYPES];
+    Bitboard pinnedPieces;
     PieceType pieceTypes[SQUARES];
     Colour sideToMove;
     Square enPassant;
@@ -18,6 +19,7 @@ typedef struct ChessBoard {
 typedef struct IrreversibleBoardState {
     Key positionKey;
     Bitboard checkers;
+    Bitboard pinnedPieces;
     PieceType capturedPiece;
     Square enPassant;
     CastlingRights castlingRights;
@@ -32,39 +34,35 @@ extern Bitboard inBetweenLine[SQUARES][SQUARES];
 extern const char *SQUARE_NAME[];
 extern const char PROMOTION_NAME[];
 
-inline Bitboard getPieces(const ChessBoard *board, Colour c, PieceType pt) {
+static inline Bitboard getPieces(const ChessBoard *restrict board, Colour c, PieceType pt) {
     return board->pieces[c][pt];
 }
 
-inline Bitboard getOccupiedSquares(const ChessBoard *board) {
+// TODO: Revisit if it is worth saving the value in board struct directly
+static inline Bitboard getOccupiedSquares(const ChessBoard *restrict board) {
     return board->pieces[WHITE][ALL_PIECES] | board->pieces[BLACK][ALL_PIECES];
 }
 
-inline Square getKingSquare(const ChessBoard *board, Colour c) {
+// TODO: Revisit if it is worth saving the king square directly
+static inline Square getKingSquare(const ChessBoard *restrict board, Colour c) {
     return bitboardToSquare(getPieces(board, c, KING));
 }
 
-inline bool isPathClear(Square from, Square to, Bitboard occupied) {
+static inline bool isPathClear(Square from, Square to, Bitboard occupied) {
     return !(inBetweenLine[from][to] & occupied);
 }
 
 void initializeChessBoard();
 
-void parseFEN(ChessBoard *board, const char *fenString);
-void addPiece(ChessBoard *board, Colour c, PieceType pt, Square sq);
+// Caller is responsible for ensuring the board is zeroed.
+void parseFEN(ChessBoard *restrict board, const char *restrict fen);
+void getFEN(const ChessBoard *restrict board, char *restrict destination);
 
-// Assumes that the piece is moving to an EMPTY square
-void movePiece(ChessBoard *board, Colour c, PieceType pt, Square fromSquare, Square toSquare); 
+void makeMove(ChessBoard *restrict board, Move move, IrreversibleBoardState *restrict ibs);
+void undoMove(ChessBoard *restrict board, Move move, const IrreversibleBoardState *restrict ibs);
+bool isLegalMove(const ChessBoard *restrict board, Move move);
 
-void removePiece(ChessBoard *board, Colour c, PieceType pt, Square sq);
-void makeMove(ChessBoard *board, const Move *move, IrreversibleBoardState *ibs);
-void undoMove(ChessBoard *board, const Move *move, const IrreversibleBoardState *ibs);
-bool isLegalMove(const ChessBoard *board, const Move *move, Bitboard pinned);
-bool isPseudoMove(const ChessBoard *board, Move move);
-
-Bitboard getPinnedPieces(const ChessBoard *board);
-Bitboard attackersTo(const ChessBoard *board, Square sq, Colour attackedSide, Bitboard occupied);
-
-void printBitboard(Bitboard b);
+// TODO: Need to find minimum validation to assert correctness
+bool isPseudoMove(const ChessBoard *restrict board, Move move);
 
 #endif
