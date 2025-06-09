@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include "utility.h"
 
+constexpr int FLIP_MASK = 0b111000;
+
 constexpr int SCORE_SCALE     = 400;
 constexpr int QUANTIZATION_A  = 255;
 constexpr int QUANTIZATION_B  =  64;
@@ -40,7 +42,6 @@ void initializeNNUE() {
 }
 
 void accumulatorAdd(Colour c, PieceType pt, Square sq) {
-    constexpr int FLIP_MASK = 0b111000;
     pt--;
     for (int i = 0; i < LAYER1; i++) {
         accumulator.accumulator[WHITE][i] += network.accumulatorWeights[c][pt][sq ^ FLIP_MASK][i];
@@ -48,6 +49,28 @@ void accumulatorAdd(Colour c, PieceType pt, Square sq) {
 
     for (int i = 0; i < LAYER1; i++) {
         accumulator.accumulator[BLACK][i] += network.accumulatorWeights[c ^ 1][pt][sq][i];
+    }
+}
+
+void accumulatorSub(Colour c, PieceType pt, Square sq) {
+    pt--;
+    for (int i = 0; i < LAYER1; i++) {
+        accumulator.accumulator[WHITE][i] -= network.accumulatorWeights[c][pt][sq ^ FLIP_MASK][i];
+    }
+
+    for (int i = 0; i < LAYER1; i++) {
+        accumulator.accumulator[BLACK][i] -= network.accumulatorWeights[c ^ 1][pt][sq][i];
+    }
+}
+
+void accumulatorAddSub(Colour c, PieceType pt, Square fromSquare, Square toSquare) {
+    pt--;
+    for (int i = 0; i < LAYER1; i++) {
+        accumulator.accumulator[WHITE][i] += network.accumulatorWeights[c][pt][toSquare ^ FLIP_MASK][i] - network.accumulatorWeights[c][pt][fromSquare ^ FLIP_MASK][i];
+    }
+
+    for (int i = 0; i < LAYER1; i++) {
+        accumulator.accumulator[BLACK][i] += network.accumulatorWeights[c ^ 1][pt][toSquare][i] - network.accumulatorWeights[c ^ 1][pt][fromSquare][i];
     }
 }
 
