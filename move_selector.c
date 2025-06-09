@@ -1,7 +1,8 @@
 #include "move_selector.h"
 #include "move_generator.h"
 #include "utility.h"
-#include "evaluation.h"
+
+constexpr Score PIECE_VALUE[PIECE_TYPES] = {0, 100, 300, 306, 500, 900, 0};
 
 static inline void swap(MoveObject *mo1, MoveObject *mo2) {
     MoveObject temp = *mo1;
@@ -17,10 +18,6 @@ static void scoreMoves(const ChessBoard *restrict board, MoveSelector *restrict 
             startList->score = PIECE_VALUE[capturedPiece] - board->pieceTypes[getFromSquare(startList->move)]; // MVV/LVA
         } else if (getMoveType(startList->move) & EN_PASSANT) {
             startList->score = 90;
-        } else if (startList->move == ms->killers[0]) {
-            startList->score = 51;
-        } else if (startList->move == ms->killers[1]) {
-            startList->score = 50;
         } else {
             startList->score = 0;
         }
