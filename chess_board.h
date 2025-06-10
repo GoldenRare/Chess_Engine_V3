@@ -1,6 +1,7 @@
 #ifndef CHESS_BOARD_H
 #define CHESS_BOARD_H
 
+#include <stdint.h>
 #include "utility.h"
 
 // TODO: Revisit what is stored in the structs, primarily the pinned pieces
@@ -13,6 +14,8 @@ typedef struct ChessBoard {
     Colour sideToMove;
     Square enPassant;
     CastlingRights castlingRights;
+    uint16_t ply;
+    uint8_t halfmoveClock;
 } ChessBoard;
 
 // Keeps track of the information that is lost when a move is made
@@ -23,6 +26,7 @@ typedef struct IrreversibleBoardState {
     PieceType capturedPiece;
     Square enPassant;
     CastlingRights castlingRights;
+    uint8_t halfmoveClock;
 } IrreversibleBoardState;
 
 // Indexing the same square will return 0. Example: fullLine[e4][e4] == 0
@@ -46,6 +50,13 @@ static inline Bitboard getOccupiedSquares(const ChessBoard *restrict board) {
 // TODO: Revisit if it is worth saving the king square directly
 static inline Square getKingSquare(const ChessBoard *restrict board, Colour c) {
     return bitboardToSquare(getPieces(board, c, KING));
+}
+
+// TODO: Technically should be when half move is 100 and not checkmate
+// TODO: Threefold repetition
+// TODO: Sufficient material
+static inline bool isDraw(const ChessBoard *restrict board) {
+    return board->halfmoveClock > 100;
 }
 
 static inline bool isPathClear(Square from, Square to, Bitboard occupied) {
