@@ -29,11 +29,15 @@ static void encodePrincipalVariation(char* buffer, const Move *pv) {
     buffer[spaceIndex] = '\0';
 }
 
-static Score quiescenceSearch(ChessBoard *board, Score alpha, Score beta) {
+static Score quiescenceSearch(ChessBoard *restrict board, Score alpha, Score beta) {
+
     /* Stand Pat */
-    int bestScore = board->checkers ? -INFINITE : evaluation(board->sideToMove); // TODO: Technically unnecessary to check alpha and beta if -INFINITE
-    if (bestScore >= beta) return bestScore; // Fail Soft
-    if (bestScore > alpha) alpha = bestScore;
+    Score bestScore = -INFINITE;
+    if (!board->checkers) {
+        bestScore = evaluation(board->sideToMove); // TODO: Could be evaluating a stalemate
+        if (bestScore >= beta) return bestScore; // Fail Soft
+        if (bestScore > alpha) alpha = bestScore;
+    }
     /*           */
 
     /* Main Moves Loop */
@@ -46,7 +50,7 @@ static Score quiescenceSearch(ChessBoard *board, Score alpha, Score beta) {
     while ((move = getNextBestMove(board, &ms))) {
         if (!isLegalMove(board, move)) continue;
         makeMove(board, move, &ibs);
-        int score = -quiescenceSearch(board, -beta, -alpha);
+        Score score = -quiescenceSearch(board, -beta, -alpha);
         undoMove(board, move, &ibs);
 
         // bestScore <= alpha < beta
@@ -62,35 +66,39 @@ static Score quiescenceSearch(ChessBoard *board, Score alpha, Score beta) {
     }
     /*                 */
 
-    /* Checkmate and Stalemate Detection */
-    if (bestScore == -INFINITE) { // Something is always better than nothing, so bestScore stays -INFINITE if it couldn't play any move
-        bestScore = board->checkers ? CHECKMATED : DRAW; // TODO: Depth/Ply correction
+    /* Checkmate and Stalemate Detection */ // TODO: Need to go over more the cases for what can happen here
+    if (bestScore == -INFINITE) {
+        bestScore = CHECKMATED; // TODO: Depth/Ply correction
     }
     /*                                   */
-
     return bestScore; // Fail Soft
-} 
+}
 
-// TODO: Update function parameters
-static int alphaBeta(ChessBoard *board, int alpha, int beta, int depth, SearchHelper *sh, bool isRootNode) {
+static Score alphaBeta(ChessBoard *restrict board, Score alpha, Score beta, Depth depth, SearchHelper *sh, bool isRootNode) {
+
     /* Quiescence Search */
     if (depth == 0) return quiescenceSearch(board, alpha, beta);
     /*                   */
 
     /* Transposition Table */
-    bool hasEvaluation;
+    /*bool hasEvaluation;
     PositionEvaluation *pe = probeTranspositionTable(board->positionKey, &hasEvaluation);
     Move ttMove = NO_MOVE;
     if (hasEvaluation) {
+        //if (pe->nodeScore == CHECKMATED || pe->nodeScore == -CHECKMATED) {
+            //char test[512];
+            //getFEN(board, test);
+            //puts(test);
+        //}
         Bound bound = getBound(pe);
-        int nodeScore = pe->nodeScore;
+        int nodeScore = pe->nodeScore <= -31500 ? CHECKMATED - depth : pe->nodeScore >= 31500 ? pe->nodeScore + depth : pe->nodeScore;
         if (pe->depth >= depth && !isRootNode) { // Do not terminate early if root node so that we can at least report one move in the pv for 'info string'
             // TODO: Consider optimizing the below and need to adjust node score
             if ((bound == LOWER && nodeScore >= beta) || (bound == UPPER && nodeScore <= alpha) || bound == EXACT) {
                 return nodeScore; // Fail Soft
             }
         }
-        ttMove = pe->bestMove; 
+        ttMove = pe->bestMove;
     }
     /*                     */
 
@@ -101,7 +109,7 @@ static int alphaBeta(ChessBoard *board, int alpha, int beta, int depth, SearchHe
 
     IrreversibleBoardState ibs;
     MoveSelector ms;
-    createMoveSelector(&ms, board, TT_MOVE, ttMove);
+    createMoveSelector(&ms, board, TT_MOVE, NO_MOVE);
 
     int bestScore = -INFINITE;
     Move bestMove = NO_MOVE;
@@ -117,7 +125,7 @@ static int alphaBeta(ChessBoard *board, int alpha, int beta, int depth, SearchHe
             bestScore = score;
             if (score > alpha) {
                 if (score >= beta) {
-                    savePositionEvaluation(pe, board->positionKey, move, depth, LOWER, score);
+                    //savePositionEvaluation(pe, board->positionKey, move, depth, LOWER, score);
                     return score; // Fail Soft
                 }
                 updatePrincipalVariation(move, sh->pv, childrenPv);
@@ -135,11 +143,11 @@ static int alphaBeta(ChessBoard *board, int alpha, int beta, int depth, SearchHe
     }
     /*                                   */
 
-    savePositionEvaluation(pe, board->positionKey, bestMove, depth, bestMove != NO_MOVE ? EXACT : UPPER, bestScore);
+    //savePositionEvaluation(pe, board->positionKey, bestMove, depth, bestMove != NO_MOVE ? EXACT : UPPER, bestScore);
     return bestScore; // Fail Soft
 }
 
-void startSearch(ChessBoard *board, int depth) {
+MoveObject startSearch(ChessBoard *board, int depth) {
     SearchHelper sh[MAX_DEPTH + 1]; //TODO: SIZE
     Move pv[MAX_DEPTH + 1];
     sh[0].pv = pv;
@@ -147,9 +155,10 @@ void startSearch(ChessBoard *board, int depth) {
     
     char pvString[2048];
     double totalTime;
+    int score = 0;
     clock_t start = clock();
     for (int d = 1; d <= depth; d++) { // TODO: Experiment with different steps for iterative deepening
-        int score = alphaBeta(board, -INFINITE, INFINITE, d, sh, true);
+        score = alphaBeta(board, -INFINITE, INFINITE, d, sh, true);
         totalTime = (double) (clock() - start) / CLOCKS_PER_SEC;
 
         encodePrincipalVariation(pvString, pv);
@@ -157,4 +166,6 @@ void startSearch(ChessBoard *board, int depth) {
         printf("info depth %d time %.0lf score cp %d pv %s\n", d, totalTime * 1000.0, score, pvString);
     }
     printf("bestmove %s\n", pvString); //TODO: Should eventually include ponder
+    MoveObject best = {pv[0], score};
+    return best;
 }
