@@ -32,18 +32,17 @@ static void encodePrincipalVariation(char* buffer, const Move *pv) {
 static Score quiescenceSearch(ChessBoard *restrict board, Score alpha, Score beta) {
 
     /* Stand Pat */
-    Score bestScore = -INFINITE;
-    if (!board->checkers) {
-        bestScore = evaluation(board->sideToMove); // TODO: Could be evaluating a stalemate
-        if (bestScore >= beta) return bestScore; // Fail Soft
-        if (bestScore > alpha) alpha = bestScore;
+    Score bestScore = board->checkers ? -INFINITE : evaluation(board->sideToMove); // TODO: Could be evaluating a stalemate
+    if (bestScore > alpha) {
+        if (bestScore >= beta) return bestScore; 
+        alpha = bestScore;
     }
     /*           */
 
     /* Main Moves Loop */
     IrreversibleBoardState ibs;
     MoveSelector ms;
-    MoveSelectorState state = board->checkers ? TT_MOVE : TEMP; // TODO: Need to do capture moves
+    MoveSelectorState state = board->checkers ? TT_MOVE : GET_NON_CAPTURE_MOVES; // TODO: Cleanup naming
     createMoveSelector(&ms, board, state, NO_MOVE);
 
     Move move;
@@ -53,24 +52,20 @@ static Score quiescenceSearch(ChessBoard *restrict board, Score alpha, Score bet
         Score score = -quiescenceSearch(board, -beta, -alpha);
         undoMove(board, move, &ibs);
 
-        // bestScore <= alpha < beta
         if (score > bestScore) {
-            bestScore = score;
             if (score > alpha) {
-                if (score >= beta) {
-                    return score; // Fail Soft
-                }
+                if (score >= beta) return score;
                 alpha = score; 
             }
+            bestScore = score;
         }
     }
     /*                 */
 
-    /* Checkmate and Stalemate Detection */ // TODO: Need to go over more the cases for what can happen here
-    if (bestScore == -INFINITE) {
-        bestScore = CHECKMATED; // TODO: Depth/Ply correction
-    }
-    /*                                   */
+    /* Checkmate Detection */ // TODO: Stalemate detection
+    if (bestScore == -INFINITE) bestScore = CHECKMATED; // TODO: Depth/Ply correction
+    /*                     */
+
     return bestScore; // Fail Soft
 }
 

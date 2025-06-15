@@ -40,11 +40,13 @@ Move getNextBestMove(const ChessBoard *restrict board, MoveSelector *restrict ms
             case TT_MOVE:
                 ms->state++;
                 return ms->ttMove;
+            case Q_SEARCH_CAPTURE_MOVES:
             case CAPTURE_MOVES:
                 ms->state++;
                 ms->endList = createMoveList(board, ms->moveList, CAPTURES);
                 scoreMoves(board, ms);
                 break;
+            case Q_SEARCH_GET_CAPTURES:
             case GET_CAPTURES:
                 Move m;
                 if ((m = getNextHighestScoringMove(ms))) return m;
@@ -58,7 +60,6 @@ Move getNextBestMove(const ChessBoard *restrict board, MoveSelector *restrict ms
                 break;
             case GET_NON_CAPTURE_MOVES:
                 return getNextHighestScoringMove(ms);
-            case TEMP:
             default:
                 return NO_MOVE;
         }

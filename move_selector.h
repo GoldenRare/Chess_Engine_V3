@@ -5,7 +5,14 @@
 #include "utility.h"
 
 typedef enum MoveSelectorState {
-    TT_MOVE, CAPTURE_MOVES, GET_CAPTURES, NON_CAPTURE_MOVES, GET_NON_CAPTURE_MOVES, TEMP
+    TT_MOVE, 
+    CAPTURE_MOVES, 
+    GET_CAPTURES, 
+    NON_CAPTURE_MOVES, 
+    GET_NON_CAPTURE_MOVES,
+     
+    Q_SEARCH_CAPTURE_MOVES,
+    Q_SEARCH_GET_CAPTURES
 } MoveSelectorState;
 
 typedef struct MoveSelector {
