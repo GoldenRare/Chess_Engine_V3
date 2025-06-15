@@ -31,6 +31,8 @@ static void encodePrincipalVariation(char* buffer, const Move *pv) {
 
 static Score quiescenceSearch(ChessBoard *restrict board, Score alpha, Score beta) {
 
+    if (isDraw(board)) return DRAW;
+    
     /* Stand Pat */
     Score bestScore = board->checkers ? -INFINITE : evaluation(board->sideToMove); // TODO: Could be evaluating a stalemate
     if (bestScore > alpha) {
@@ -74,6 +76,8 @@ static Score alphaBeta(ChessBoard *restrict board, Score alpha, Score beta, Dept
     /* Quiescence Search */
     if (depth == 0) return quiescenceSearch(board, alpha, beta);
     /*                   */
+
+    if (isDraw(board)) return DRAW;
 
     /* Transposition Table */
     /*bool hasEvaluation;
