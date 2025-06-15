@@ -158,7 +158,7 @@ void initializeChessBoard() {
     }
 }
 
-void parseFEN(ChessBoard *restrict board, const char *restrict fenString) {
+void parseFEN(ChessBoard *restrict board, const char *restrict fen) {
     static const Colour CHAR_TO_COLOUR[128] = {
         ['P'] = WHITE, ['p'] = BLACK, 
         ['N'] = WHITE, ['n'] = BLACK, 
@@ -184,8 +184,8 @@ void parseFEN(ChessBoard *restrict board, const char *restrict fenString) {
 
     /* 1) Piece Placement */
     Square sq = A8;
-    while (*fenString != ' ') {
-        unsigned char ch = *fenString++;
+    while (*fen != ' ') {
+        unsigned char ch = *fen++;
         if (ch > 'A') {
             addPiece(board, CHAR_TO_COLOUR[ch], CHAR_TO_PIECE_TYPE[ch], sq++);
             board->positionKey ^= zobristHashes.pieceOnSquare[CHAR_TO_PIECE_TYPE[ch] + COLOUR_OFFSET * CHAR_TO_COLOUR[ch]][sq];
@@ -195,27 +195,111 @@ void parseFEN(ChessBoard *restrict board, const char *restrict fenString) {
     }
 
     /* 2) Side to Move */
-    board->sideToMove = CHAR_TO_COLOUR[(unsigned char)*++fenString];
+    board->sideToMove = CHAR_TO_COLOUR[(unsigned char)*++fen];
     if (board->sideToMove) board->positionKey ^= zobristHashes.sideToMove;
-    fenString++;
+    fen++;
 
     /* 3) Castling Ability */
-    while (*++fenString != ' ') board->castlingRights |= CHAR_TO_CASTLING_RIGHTS[(unsigned char) *fenString];
+    while (*++fen != ' ') board->castlingRights |= CHAR_TO_CASTLING_RIGHTS[(unsigned char) *fen];
     board->positionKey ^= zobristHashes.castlingRights[board->castlingRights];
     
     /* 4) En Passant Target Square */
-    if (*++fenString != '-') {
-            int file = *fenString - 'a';
-            int rank = *++fenString - '8';
+    if (*++fen != '-') {
+            int file = *fen - 'a';
+            int rank = *++fen - '8';
             board->enPassant = rank * -8 + file;
             board->positionKey ^= zobristHashes.enPassant[file];
     } else {
         board->enPassant = NO_SQUARE;
     }
+    fen++;
 
-    /* 5) Miscellaneous Data */
+    /* 5) Halfmove Clock */
+    board->halfmoveClock = 0;
+    while (*++fen != ' ') board->halfmoveClock = board->halfmoveClock * 10 + *fen - '0';
+
+    /* 6) Fullmove Counter -> Ply */
+    board->ply = 0;
+    while (*++fen) board->ply = board->ply * 10 + *fen - '0';
+    board->ply = (board->ply << 1) - (board->sideToMove ^ 1);
+
+    /* 7) Miscellaneous Data */
     board->checkers = attackersTo(board, getKingSquare(board, board->sideToMove), board->sideToMove, getOccupiedSquares(board));
     board->pinnedPieces = getPinnedPieces(board);
+}
+
+void getFEN(const ChessBoard *restrict board, char *restrict destination) {
+    constexpr char PIECE_TYPE_TO_CHAR[] = " PNBRQK";
+    constexpr char CASTLING_RIGHTS_TO_CHAR[] = {
+        [WHITE_QUEENSIDE] = 'Q', [BLACK_QUEENSIDE] = 'q', 
+        [WHITE_KINGSIDE]  = 'K', [BLACK_KINGSIDE]  = 'k'
+    };
+
+    /* 1) Piece Placement */
+    int empty = 0;
+    for (Square sq = A8; sq < SQUARES; sq++) {
+        if (board->pieceTypes[sq]) {
+            if (empty) *destination++ = '0' + empty;
+            empty = 0;
+            char ch = PIECE_TYPE_TO_CHAR[board->pieceTypes[sq]];
+            *destination++ = ch + 32 * (bool) (board->pieces[BLACK][board->pieceTypes[sq]] & squareToBitboard(sq));
+        } else empty++;
+
+        if (squareToBitboard(sq) & FILE_H_BB) {
+            if (empty) *destination++ = '0' + empty;
+            empty = 0;
+            if (sq != H1) *destination++ = '/';
+        }
+    }
+    *destination++ = ' ';
+
+    /* 2) Side to Move */
+    *destination++ = board->sideToMove ? 'b' : 'w';
+    *destination++ = ' ';
+
+    /* 3) Castling Ability */
+    if (board->castlingRights) {
+        for (CastlingRights cr = WHITE_KINGSIDE; cr <= BLACK_QUEENSIDE; cr <<= 1)
+            if (board->castlingRights & cr)
+                *destination++ = CASTLING_RIGHTS_TO_CHAR[board->castlingRights & cr];
+    } else {
+        *destination++ = '-';
+    }
+    *destination++ = ' ';
+
+    /* 4) En Passant Target Square */
+    if (board->enPassant != NO_SQUARE) {
+        *destination++ = SQUARE_NAME[board->enPassant][0];
+        *destination++ = SQUARE_NAME[board->enPassant][1];
+    } else {
+        *destination++ = '-';
+    }
+    *destination++ = ' ';
+
+    /* 5) Halfmove Clock */
+    int halfmoveClock = board->halfmoveClock;
+    char helper[8];
+    int i = 0;
+    helper[i++] = '0' + halfmoveClock % 10;
+    halfmoveClock /= 10;
+    while (halfmoveClock) {
+        helper[i++] = '0' + halfmoveClock % 10;
+        halfmoveClock /= 10;
+    }
+    while (i > 0) *destination++ = helper[--i];
+    *destination++ = ' ';
+
+    /* 6) Fullmove Counter -> Ply */
+    int fullmoveCounter = board->ply / 2 + (board->sideToMove == WHITE);
+    helper[i++] = '0' + fullmoveCounter % 10;
+    fullmoveCounter /= 10;
+    while (fullmoveCounter) {
+        helper[i++] = '0' + fullmoveCounter % 10;
+        fullmoveCounter /= 10;
+    }
+    while (i > 0) *destination++ = helper[--i];
+
+    *destination = '\0';
 }
 
 void makeMove(ChessBoard *restrict board, Move move, IrreversibleBoardState *restrict ibs) {
@@ -231,10 +315,13 @@ void makeMove(ChessBoard *restrict board, Move move, IrreversibleBoardState *res
     ibs->castlingRights = board->castlingRights;
     ibs->enPassant = board->enPassant;
     ibs->pinnedPieces = board->pinnedPieces;
-    
+    ibs->halfmoveClock = board->halfmoveClock;
+
+    board->halfmoveClock++;
     if (ibs->capturedPiece != NO_PIECE) {
         removePiece(board, board->sideToMove ^ 1, ibs->capturedPiece, captureSquare);
         board->positionKey ^= zobristHashes.pieceOnSquare[ibs->capturedPiece + COLOUR_OFFSET * (board->sideToMove ^ 1)][captureSquare];
+        board->halfmoveClock = 0;
     } else if (moveType == CASTLE) {
         bool isKingSideCastle = toSquare > fromSquare;
         Square rookFromSquare = isKingSideCastle ? moveSquareInDirection(toSquare  , EAST) : moveSquareInDirection(toSquare  , WEST + WEST);
@@ -244,6 +331,7 @@ void makeMove(ChessBoard *restrict board, Move move, IrreversibleBoardState *res
                            ^  zobristHashes.pieceOnSquare[ROOK + COL_OFFSET][rookToSquare  ];
     } 
     
+    if (board->pieceTypes[fromSquare] == PAWN) board->halfmoveClock = 0;
     if (moveType & PROMOTION) {
         PieceType pt = KNIGHT + (moveType & PROMOTION_PIECE_OFFSET_MASK);
         addPiece(board, board->sideToMove, pt, toSquare);
@@ -268,7 +356,9 @@ void makeMove(ChessBoard *restrict board, Move move, IrreversibleBoardState *res
     } else {
         board->enPassant = NO_SQUARE;
     }
+
     board->sideToMove ^= 1;
+    board->ply++;
     board->positionKey ^= zobristHashes.sideToMove;
     board->checkers = attackersTo(board, getKingSquare(board, board->sideToMove), board->sideToMove, getOccupiedSquares(board));
     board->pinnedPieces = getPinnedPieces(board);
@@ -281,6 +371,8 @@ void undoMove(ChessBoard *restrict board, Move move, const IrreversibleBoardStat
     board->castlingRights = ibs->castlingRights;
     board->checkers = ibs->checkers;
     board->pinnedPieces = ibs->pinnedPieces;
+    board->halfmoveClock = ibs->halfmoveClock;
+    board->ply--;
     
     Square fromSquare = getFromSquare(move);
     Square toSquare = getToSquare(move);
