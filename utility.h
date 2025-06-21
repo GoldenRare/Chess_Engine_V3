@@ -9,11 +9,11 @@ typedef uint64_t Key;
 typedef uint16_t Move;
 
 typedef int32_t Depth;
-typedef int32_t Score;
+typedef int32_t Score; // TODO: Could be the Value enum
 
 typedef struct MoveObject {
     Move move;
-    uint16_t score;
+    int16_t score;
 } MoveObject;
 
 typedef enum PieceType {
@@ -67,11 +67,11 @@ typedef enum CastlingRights {
 } CastlingRights;
 
 typedef enum Value {
-    CHECKMATED = -32000, DRAW = 0, INFINITE = 32700 // TODO
+    DRAW = 0, GUARANTEE_CHECKMATE = 31500, CHECKMATE = 32000, INFINITE = 32767 // TODO: Range of guarantee checkmate
 } Value;
 
 typedef enum Bound {
-    UPPER, LOWER, EXACT
+    LOWER, EXACT, UPPER
 } Bound;
 
 constexpr Bitboard RANK_1_BB = 0x00000000000000FFULL;
@@ -89,6 +89,9 @@ constexpr Bitboard FILE_H_BB = FILE_G_BB >> -EAST;
 constexpr Bitboard A8_BB = FILE_A_BB & RANK_8_BB;
 
 constexpr Move NO_MOVE = 0;
+
+constexpr char START_POS[] = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+constexpr int MAX_MOVES = 256;
 
 static inline Rank squareToRank(Square sq) {
     return RANK_8 - (sq >> 3);

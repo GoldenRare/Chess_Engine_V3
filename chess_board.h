@@ -4,30 +4,27 @@
 #include <stdint.h>
 #include "utility.h"
 
-// TODO: Revisit what is stored in the structs, primarily the pinned pieces
-typedef struct ChessBoard {
-    Bitboard pieces[COLOURS][PIECE_TYPES];
-    Key positionKey;
-    Bitboard checkers;
-    Bitboard pinnedPieces;
-    PieceType pieceTypes[SQUARES];
-    Colour sideToMove;
-    Square enPassant;
-    CastlingRights castlingRights;
-    uint16_t ply;
-    uint8_t halfmoveClock;
-} ChessBoard;
-
-// Keeps track of the information that is lost when a move is made
-typedef struct IrreversibleBoardState {
+// Uses a linked list to keep track of the history of the game. 
+// Maintains information that is lost when a move is made but also
+// information that is expensive to compute so instead of recomputing it is saved. 
+typedef struct ChessBoardHistory {
+    struct ChessBoardHistory *previous;
     Key positionKey;
     Bitboard checkers;
     Bitboard pinnedPieces;
     PieceType capturedPiece;
     Square enPassant;
     CastlingRights castlingRights;
-    uint8_t halfmoveClock;
-} IrreversibleBoardState;
+    uint8_t halfmoveClock; // TODO: Maybe the type
+} ChessBoardHistory;
+
+typedef struct ChessBoard {
+    ChessBoardHistory *history;
+    Bitboard pieces[COLOURS][PIECE_TYPES];
+    PieceType pieceTypes[SQUARES];
+    Colour sideToMove;
+    uint16_t ply; // TODO: Maybe the type
+} ChessBoard;
 
 // Indexing the same square will return 0. Example: fullLine[e4][e4] == 0
 extern Bitboard fullLine[SQUARES][SQUARES];
@@ -42,12 +39,10 @@ static inline Bitboard getPieces(const ChessBoard *restrict board, Colour c, Pie
     return board->pieces[c][pt];
 }
 
-// TODO: Revisit if it is worth saving the value in board struct directly
 static inline Bitboard getOccupiedSquares(const ChessBoard *restrict board) {
     return board->pieces[WHITE][ALL_PIECES] | board->pieces[BLACK][ALL_PIECES];
 }
 
-// TODO: Revisit if it is worth saving the king square directly
 static inline Square getKingSquare(const ChessBoard *restrict board, Colour c) {
     return bitboardToSquare(getPieces(board, c, KING));
 }
@@ -55,8 +50,9 @@ static inline Square getKingSquare(const ChessBoard *restrict board, Colour c) {
 // TODO: Technically should be when half move is 100 and not checkmate
 // TODO: Threefold repetition
 // TODO: Sufficient material
+// TODO: Stalemate
 static inline bool isDraw(const ChessBoard *restrict board) {
-    return board->halfmoveClock > 100;
+    return board->history->halfmoveClock > 100;
 }
 
 static inline bool isPathClear(Square from, Square to, Bitboard occupied) {
@@ -65,12 +61,13 @@ static inline bool isPathClear(Square from, Square to, Bitboard occupied) {
 
 void initializeChessBoard();
 
-// Caller is responsible for ensuring the board is zeroed.
-void parseFEN(ChessBoard *restrict board, const char *restrict fen);
+// Caller is responsible for ensuring the board and history struct are zeroed and
+// that the history pointer lasts for the necessary duration.
+void parseFEN(ChessBoard *board, ChessBoardHistory *history, const char *restrict fen);
 void getFEN(const ChessBoard *restrict board, char *restrict destination);
 
-void makeMove(ChessBoard *restrict board, Move move, IrreversibleBoardState *restrict ibs);
-void undoMove(ChessBoard *restrict board, Move move, const IrreversibleBoardState *restrict ibs);
+void makeMove(ChessBoard *board, ChessBoardHistory *history, Move move);
+void undoMove(ChessBoard *restrict board, Move move);
 bool isLegalMove(const ChessBoard *restrict board, Move move);
 
 // TODO: Need to find minimum validation to assert correctness

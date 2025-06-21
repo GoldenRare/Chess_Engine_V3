@@ -1,5 +1,4 @@
 #include <stdlib.h>
-#include <stdio.h>
 #include <stdint.h>
 #include "chess_board.h"
 #include "utility.h"
@@ -158,7 +157,7 @@ void initializeChessBoard() {
     }
 }
 
-void parseFEN(ChessBoard *restrict board, const char *restrict fen) {
+void parseFEN(ChessBoard *board, ChessBoardHistory *history, const char *restrict fen) {
     static const Colour CHAR_TO_COLOUR[128] = {
         ['P'] = WHITE, ['p'] = BLACK, 
         ['N'] = WHITE, ['n'] = BLACK, 
@@ -182,13 +181,14 @@ void parseFEN(ChessBoard *restrict board, const char *restrict fen) {
         ['-'] = 0
     };
 
+    board->history = history;
     /* 1) Piece Placement */
     Square sq = A8;
     while (*fen != ' ') {
         unsigned char ch = *fen++;
         if (ch > 'A') {
             addPiece(board, CHAR_TO_COLOUR[ch], CHAR_TO_PIECE_TYPE[ch], sq++);
-            board->positionKey ^= zobristHashes.pieceOnSquare[CHAR_TO_PIECE_TYPE[ch] + COLOUR_OFFSET * CHAR_TO_COLOUR[ch]][sq];
+            board->history->positionKey ^= zobristHashes.pieceOnSquare[CHAR_TO_PIECE_TYPE[ch] + COLOUR_OFFSET * CHAR_TO_COLOUR[ch]][sq];
         } else if (ch > '/') {
             sq += ch - '0';
         }
@@ -196,27 +196,27 @@ void parseFEN(ChessBoard *restrict board, const char *restrict fen) {
 
     /* 2) Side to Move */
     board->sideToMove = CHAR_TO_COLOUR[(unsigned char)*++fen];
-    if (board->sideToMove) board->positionKey ^= zobristHashes.sideToMove;
+    if (board->sideToMove) board->history->positionKey ^= zobristHashes.sideToMove;
     fen++;
 
     /* 3) Castling Ability */
-    while (*++fen != ' ') board->castlingRights |= CHAR_TO_CASTLING_RIGHTS[(unsigned char) *fen];
-    board->positionKey ^= zobristHashes.castlingRights[board->castlingRights];
+    while (*++fen != ' ') board->history->castlingRights |= CHAR_TO_CASTLING_RIGHTS[(unsigned char) *fen];
+    board->history->positionKey ^= zobristHashes.castlingRights[board->history->castlingRights];
     
     /* 4) En Passant Target Square */
     if (*++fen != '-') {
             int file = *fen - 'a';
             int rank = *++fen - '8';
-            board->enPassant = rank * -8 + file;
-            board->positionKey ^= zobristHashes.enPassant[file];
+            board->history->enPassant = rank * -8 + file;
+            board->history->positionKey ^= zobristHashes.enPassant[file];
     } else {
-        board->enPassant = NO_SQUARE;
+        board->history->enPassant = NO_SQUARE;
     }
     fen++;
 
     /* 5) Halfmove Clock */
-    board->halfmoveClock = 0;
-    while (*++fen != ' ') board->halfmoveClock = board->halfmoveClock * 10 + *fen - '0';
+    board->history->halfmoveClock = 0;
+    while (*++fen != ' ') board->history->halfmoveClock = board->history->halfmoveClock * 10 + *fen - '0';
 
     /* 6) Fullmove Counter -> Ply */
     board->ply = 0;
@@ -224,8 +224,8 @@ void parseFEN(ChessBoard *restrict board, const char *restrict fen) {
     board->ply = (board->ply << 1) - (board->sideToMove ^ 1);
 
     /* 7) Miscellaneous Data */
-    board->checkers = attackersTo(board, getKingSquare(board, board->sideToMove), board->sideToMove, getOccupiedSquares(board));
-    board->pinnedPieces = getPinnedPieces(board);
+    board->history->checkers = attackersTo(board, getKingSquare(board, board->sideToMove), board->sideToMove, getOccupiedSquares(board));
+    board->history->pinnedPieces = getPinnedPieces(board);
 }
 
 void getFEN(const ChessBoard *restrict board, char *restrict destination) {
@@ -258,26 +258,26 @@ void getFEN(const ChessBoard *restrict board, char *restrict destination) {
     *destination++ = ' ';
 
     /* 3) Castling Ability */
-    if (board->castlingRights) {
+    if (board->history->castlingRights) {
         for (CastlingRights cr = WHITE_KINGSIDE; cr <= BLACK_QUEENSIDE; cr <<= 1)
-            if (board->castlingRights & cr)
-                *destination++ = CASTLING_RIGHTS_TO_CHAR[board->castlingRights & cr];
+            if (board->history->castlingRights & cr)
+                *destination++ = CASTLING_RIGHTS_TO_CHAR[board->history->castlingRights & cr];
     } else {
         *destination++ = '-';
     }
     *destination++ = ' ';
 
     /* 4) En Passant Target Square */
-    if (board->enPassant != NO_SQUARE) {
-        *destination++ = SQUARE_NAME[board->enPassant][0];
-        *destination++ = SQUARE_NAME[board->enPassant][1];
+    if (board->history->enPassant != NO_SQUARE) {
+        *destination++ = SQUARE_NAME[board->history->enPassant][0];
+        *destination++ = SQUARE_NAME[board->history->enPassant][1];
     } else {
         *destination++ = '-';
     }
     *destination++ = ' ';
 
     /* 5) Halfmove Clock */
-    int halfmoveClock = board->halfmoveClock;
+    int halfmoveClock = board->history->halfmoveClock;
     char helper[8];
     int i = 0;
     helper[i++] = '0' + halfmoveClock % 10;
@@ -302,82 +302,75 @@ void getFEN(const ChessBoard *restrict board, char *restrict destination) {
     *destination = '\0';
 }
 
-void makeMove(ChessBoard *restrict board, Move move, IrreversibleBoardState *restrict ibs) {
-    const size_t COL_OFFSET = COLOUR_OFFSET * board->sideToMove;
+void makeMove(ChessBoard *board, ChessBoardHistory *history, Move move) {
     Square fromSquare = getFromSquare(move);
-    Square toSquare = getToSquare(move);
-    MoveType moveType = getMoveType(move);
+    Square   toSquare = getToSquare  (move);
+    MoveType moveType = getMoveType  (move);
     Square captureSquare = moveType & EN_PASSANT ? moveSquareInDirection(toSquare, board->sideToMove ? NORTH : SOUTH) : toSquare;
+    PieceType colOffset = COLOUR_OFFSET * board->sideToMove;
 
-    ibs->capturedPiece = board->pieceTypes[captureSquare];
-    ibs->positionKey = board->positionKey;
-    ibs->checkers = board->checkers;
-    ibs->castlingRights = board->castlingRights;
-    ibs->enPassant = board->enPassant;
-    ibs->pinnedPieces = board->pinnedPieces;
-    ibs->halfmoveClock = board->halfmoveClock;
+    history->previous = board->history;
+    history->positionKey = board->history->positionKey;
+    history->capturedPiece = board->pieceTypes[captureSquare];
+    history->castlingRights = board->history->castlingRights;
+    history->halfmoveClock = board->history->halfmoveClock + 1;
 
-    board->halfmoveClock++;
-    if (ibs->capturedPiece != NO_PIECE) {
-        removePiece(board, board->sideToMove ^ 1, ibs->capturedPiece, captureSquare);
-        board->positionKey ^= zobristHashes.pieceOnSquare[ibs->capturedPiece + COLOUR_OFFSET * (board->sideToMove ^ 1)][captureSquare];
-        board->halfmoveClock = 0;
+    if (history->capturedPiece) {
+        removePiece(board, board->sideToMove ^ 1, history->capturedPiece, captureSquare);
+        history->positionKey ^= zobristHashes.pieceOnSquare[history->capturedPiece + COLOUR_OFFSET * (board->sideToMove ^ 1)][captureSquare];
+        history->halfmoveClock = 0;
     } else if (moveType == CASTLE) {
         bool isKingSideCastle = toSquare > fromSquare;
         Square rookFromSquare = isKingSideCastle ? moveSquareInDirection(toSquare  , EAST) : moveSquareInDirection(toSquare  , WEST + WEST);
         Square rookToSquare   = isKingSideCastle ? moveSquareInDirection(fromSquare, EAST) : moveSquareInDirection(fromSquare, WEST       );
         movePiece(board, board->sideToMove, ROOK, rookFromSquare, rookToSquare);
-        board->positionKey ^= zobristHashes.pieceOnSquare[ROOK + COL_OFFSET][rookFromSquare] 
-                           ^  zobristHashes.pieceOnSquare[ROOK + COL_OFFSET][rookToSquare  ];
+        history->positionKey ^= zobristHashes.pieceOnSquare[ROOK + colOffset][rookFromSquare] 
+                           ^  zobristHashes.pieceOnSquare[ROOK + colOffset][rookToSquare  ];
     } 
     
-    if (board->pieceTypes[fromSquare] == PAWN) board->halfmoveClock = 0;
+    if (board->pieceTypes[fromSquare] == PAWN) history->halfmoveClock = 0;
     if (moveType & PROMOTION) {
         PieceType pt = KNIGHT + (moveType & PROMOTION_PIECE_OFFSET_MASK);
         addPiece(board, board->sideToMove, pt, toSquare);
-        board->positionKey ^= zobristHashes.pieceOnSquare[pt + COL_OFFSET][toSquare];
+        history->positionKey ^= zobristHashes.pieceOnSquare[pt + colOffset][toSquare];
         removePiece(board, board->sideToMove, PAWN, fromSquare);
-        board->positionKey ^= zobristHashes.pieceOnSquare[PAWN + COL_OFFSET][fromSquare];
+        history->positionKey ^= zobristHashes.pieceOnSquare[PAWN + colOffset][fromSquare];
     } else {
         movePiece(board, board->sideToMove, board->pieceTypes[fromSquare], fromSquare, toSquare);
-        board->positionKey ^= zobristHashes.pieceOnSquare[board->pieceTypes[fromSquare] + COL_OFFSET][fromSquare] 
-                           ^  zobristHashes.pieceOnSquare[board->pieceTypes[fromSquare] + COL_OFFSET][toSquare  ];
+        history->positionKey ^= zobristHashes.pieceOnSquare[board->pieceTypes[fromSquare] + colOffset][fromSquare] 
+                           ^  zobristHashes.pieceOnSquare[board->pieceTypes[fromSquare] + colOffset][toSquare  ];
     }
 
-    if (board->enPassant != NO_SQUARE) board->positionKey ^= zobristHashes.enPassant[squareToFile(board->enPassant)];
-    if (board->castlingRights) {
-        board->positionKey ^= zobristHashes.castlingRights[board->castlingRights];
-        board->castlingRights &= CASTLING_RIGHTS_MASK[fromSquare] & CASTLING_RIGHTS_MASK[toSquare];
-        board->positionKey ^= zobristHashes.castlingRights[board->castlingRights];
+    if (board->history->enPassant != NO_SQUARE) history->positionKey ^= zobristHashes.enPassant[squareToFile(board->history->enPassant)];
+    if (history->castlingRights) {
+        history->positionKey ^= zobristHashes.castlingRights[history->castlingRights];
+        history->castlingRights &= CASTLING_RIGHTS_MASK[fromSquare] & CASTLING_RIGHTS_MASK[toSquare];
+        history->positionKey ^= zobristHashes.castlingRights[history->castlingRights];
     } 
     if (moveType == DOUBLE_PAWN_PUSH) {
-        board->enPassant = moveSquareInDirection(toSquare, board->sideToMove ? NORTH : SOUTH);
-        board->positionKey ^= zobristHashes.enPassant[squareToFile(board->enPassant)];
+        history->enPassant = moveSquareInDirection(toSquare, board->sideToMove ? NORTH : SOUTH);
+        history->positionKey ^= zobristHashes.enPassant[squareToFile(history->enPassant)];
     } else {
-        board->enPassant = NO_SQUARE;
+        history->enPassant = NO_SQUARE;
     }
 
+    board->history = history;
     board->sideToMove ^= 1;
     board->ply++;
-    board->positionKey ^= zobristHashes.sideToMove;
-    board->checkers = attackersTo(board, getKingSquare(board, board->sideToMove), board->sideToMove, getOccupiedSquares(board));
-    board->pinnedPieces = getPinnedPieces(board);
+    history->positionKey ^= zobristHashes.sideToMove;
+    history->checkers = attackersTo(board, getKingSquare(board, board->sideToMove), board->sideToMove, getOccupiedSquares(board));
+    history->pinnedPieces = getPinnedPieces(board);
 }
 
-void undoMove(ChessBoard *restrict board, Move move, const IrreversibleBoardState *restrict ibs) {
-    board->positionKey = ibs->positionKey;
-    board->sideToMove ^= 1;
-    board->enPassant = ibs->enPassant;
-    board->castlingRights = ibs->castlingRights;
-    board->checkers = ibs->checkers;
-    board->pinnedPieces = ibs->pinnedPieces;
-    board->halfmoveClock = ibs->halfmoveClock;
-    board->ply--;
-    
+void undoMove(ChessBoard *restrict board, Move move) {
     Square fromSquare = getFromSquare(move);
-    Square toSquare = getToSquare(move);
-    MoveType moveType = getMoveType(move);
-    Colour stm = board->sideToMove;
+    Square   toSquare = getToSquare  (move);
+    MoveType moveType = getMoveType  (move);
+    Colour stm = board->sideToMove ^= 1;
+    PieceType capturedPiece = board->history->capturedPiece;
+
+    board->history = board->history->previous;
+    board->ply--;
     
     if (moveType & PROMOTION) {
         removePiece(board, stm, board->pieceTypes[toSquare], toSquare);
@@ -386,9 +379,9 @@ void undoMove(ChessBoard *restrict board, Move move, const IrreversibleBoardStat
         movePiece(board, stm, board->pieceTypes[toSquare], toSquare, fromSquare);
     }
 
-    if (ibs->capturedPiece != NO_PIECE) {
-        Square captureSquare = moveType == EN_PASSANT ? moveSquareInDirection(toSquare, stm ? NORTH : SOUTH) : toSquare;
-        addPiece(board, stm ^ 1, ibs->capturedPiece, captureSquare);
+    if (capturedPiece) {
+        Square captureSquare = moveType & EN_PASSANT ? moveSquareInDirection(toSquare, stm ? NORTH : SOUTH) : toSquare;
+        addPiece(board, stm ^ 1, capturedPiece, captureSquare);
     } else if (moveType == CASTLE) {
         bool isKingSideCastle = toSquare > fromSquare;
         Square rookFromSquare = isKingSideCastle ? moveSquareInDirection(toSquare  , EAST) : moveSquareInDirection(toSquare  , WEST + WEST);
@@ -428,7 +421,7 @@ bool isLegalMove(const ChessBoard *restrict board, Move move) {
         return !attackersTo(board, toSquare, stm, getOccupiedSquares(board) ^ fromSquareBB);
     }
     
-    return !(board->pinnedPieces & fromSquareBB) || fullLine[fromSquare][toSquare] & squareToBitboard(kingSquare);
+    return !(board->history->pinnedPieces & fromSquareBB) || fullLine[fromSquare][toSquare] & squareToBitboard(kingSquare);
 }
 
 bool isPseudoMove(const ChessBoard *restrict board, Move move) {
