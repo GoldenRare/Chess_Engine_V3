@@ -8,7 +8,7 @@
 // Maintains information that is lost when a move is made but also
 // information that is expensive to compute so instead of recomputing it is saved. 
 typedef struct ChessBoardHistory {
-    struct ChessBoardHistory *previous;
+    struct ChessBoardHistory *previous; // TODO: Consider making it an array in the struct, or pointer that is sequential
     Key positionKey;
     Bitboard checkers;
     Bitboard pinnedPieces;
@@ -35,6 +35,10 @@ extern Bitboard inBetweenLine[SQUARES][SQUARES];
 extern const char *SQUARE_NAME[];
 extern const char PROMOTION_NAME[];
 
+static inline Key getPositionKey(const ChessBoard *restrict board) {
+    return board->history->positionKey;
+}
+
 static inline Bitboard getPieces(const ChessBoard *restrict board, Colour c, PieceType pt) {
     return board->pieces[c][pt];
 }
@@ -43,15 +47,32 @@ static inline Bitboard getOccupiedSquares(const ChessBoard *restrict board) {
     return board->pieces[WHITE][ALL_PIECES] | board->pieces[BLACK][ALL_PIECES];
 }
 
+static inline Bitboard getCheckers(const ChessBoard *restrict board) {
+    return board->history->checkers;
+}
+
 static inline Square getKingSquare(const ChessBoard *restrict board, Colour c) {
     return bitboardToSquare(getPieces(board, c, KING));
 }
 
 // TODO: Technically should be when half move is 100 and not checkmate
-// TODO: Threefold repetition
+// TODO: Threefold repetition, greater or equal to 8
 // TODO: Sufficient material
 // TODO: Stalemate
+// TODO: Null pointer checks needed if the previous positions are not there such as setting FEN to not start
 static inline bool isDraw(const ChessBoard *restrict board) {
+    /*// Twofold repetition
+    if (board->history->halfmoveClock >= 4) {
+        Key current = getPositionKey(board);
+        ChessBoardHistory *previous = board->history->previous->previous->previous->previous;
+        if (current == previous->positionKey) return true;
+        int count = previous->halfmoveClock;
+        while (count >= 2) {
+            previous = previous->previous->previous;
+            if (current == previous->positionKey) return true;
+            count -= 2;
+        }
+    }*/
     return board->history->halfmoveClock > 100;
 }
 
