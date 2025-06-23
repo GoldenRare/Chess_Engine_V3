@@ -33,8 +33,9 @@ static Score quiescenceSearch(ChessBoard *restrict board, Score alpha, Score bet
 
     if (isDraw(board)) return DRAW;
     
-    /* Stand Pat */
-    Score bestScore = board->checkers ? -INFINITE : evaluation(board->sideToMove); // TODO: Could be evaluating a stalemate
+    Bitboard checkers = getCheckers(board);
+    /* Stand Pat */ // TODO: Ply should be relative to root rather than game
+    Score bestScore = checkers ? -CHECKMATE + board->ply : evaluation(board->sideToMove); // TODO: Could be evaluating a stalemate
     if (bestScore > alpha) {
         if (bestScore >= beta) return bestScore; 
         alpha = bestScore;
@@ -42,17 +43,17 @@ static Score quiescenceSearch(ChessBoard *restrict board, Score alpha, Score bet
     /*           */
 
     /* Main Moves Loop */
-    IrreversibleBoardState ibs;
+    ChessBoardHistory history;
     MoveSelector ms;
-    MoveSelectorState state = board->checkers ? TT_MOVE : GET_NON_CAPTURE_MOVES; // TODO: Cleanup naming
+    MoveSelectorState state = checkers ? TT_MOVE : GET_NON_CAPTURE_MOVES; // TODO: Cleanup naming
     createMoveSelector(&ms, board, state, NO_MOVE);
 
     Move move;
     while ((move = getNextBestMove(board, &ms))) {
         if (!isLegalMove(board, move)) continue;
-        makeMove(board, move, &ibs);
+        makeMove(board, &history, move);
         Score score = -quiescenceSearch(board, -beta, -alpha);
-        undoMove(board, move, &ibs);
+        undoMove(board, move);
 
         if (score > bestScore) {
             if (score > alpha) {
@@ -63,34 +64,24 @@ static Score quiescenceSearch(ChessBoard *restrict board, Score alpha, Score bet
         }
     }
     /*                 */
-
-    /* Checkmate Detection */ // TODO: Stalemate detection
-    if (bestScore == -INFINITE) bestScore = CHECKMATED; // TODO: Depth/Ply correction
-    /*                     */
-
-    return bestScore; // Fail Soft
+    return bestScore;
 }
 
 static Score alphaBeta(ChessBoard *restrict board, Score alpha, Score beta, Depth depth, SearchHelper *sh, bool isRootNode) {
 
     /* Quiescence Search */
-    if (depth == 0) return quiescenceSearch(board, alpha, beta);
+    if (!depth) return quiescenceSearch(board, alpha, beta);
     /*                   */
 
     if (isDraw(board)) return DRAW;
 
     /* Transposition Table */
     /*bool hasEvaluation;
-    PositionEvaluation *pe = probeTranspositionTable(board->positionKey, &hasEvaluation);
+    PositionEvaluation *pe = probeTranspositionTable(board->history->positionKey, &hasEvaluation);
     Move ttMove = NO_MOVE;
     if (hasEvaluation) {
-        //if (pe->nodeScore == CHECKMATED || pe->nodeScore == -CHECKMATED) {
-            //char test[512];
-            //getFEN(board, test);
-            //puts(test);
-        //}
         Bound bound = getBound(pe);
-        int nodeScore = pe->nodeScore <= -31500 ? CHECKMATED - depth : pe->nodeScore >= 31500 ? pe->nodeScore + depth : pe->nodeScore;
+        int nodeScore = pe->nodeScore;
         if (pe->depth >= depth && !isRootNode) { // Do not terminate early if root node so that we can at least report one move in the pv for 'info string'
             // TODO: Consider optimizing the below and need to adjust node score
             if ((bound == LOWER && nodeScore >= beta) || (bound == UPPER && nodeScore <= alpha) || bound == EXACT) {
@@ -106,44 +97,43 @@ static Score alphaBeta(ChessBoard *restrict board, Score alpha, Score beta, Dept
     sh[1].pv = childrenPv;
     childrenPv[0] = NO_MOVE;
 
-    IrreversibleBoardState ibs;
+    ChessBoardHistory history;
     MoveSelector ms;
     createMoveSelector(&ms, board, TT_MOVE, NO_MOVE);
 
-    int bestScore = -INFINITE;
+    Score bestScore = -INFINITE;
     Move bestMove = NO_MOVE;
     Move move;
     while ((move = getNextBestMove(board, &ms))) {
         if (!isLegalMove(board, move)) continue;
-        makeMove(board, move, &ibs);
-        int score = -alphaBeta(board, -beta, -alpha, depth - 1, sh + 1, false);
-        undoMove(board, move, &ibs);
+        makeMove(board, &history, move);
+        Score score = -alphaBeta(board, -beta, -alpha, depth - 1, sh + 1, false);
+        undoMove(board, move);
 
-        // bestScore <= alpha < beta
         if (score > bestScore) {
-            bestScore = score;
             if (score > alpha) {
                 if (score >= beta) {
-                    //savePositionEvaluation(pe, board->positionKey, move, depth, LOWER, score);
+                    //savePositionEvaluation(pe, board->history->positionKey, move, depth, LOWER, score);
                     return score; // Fail Soft
                 }
                 updatePrincipalVariation(move, sh->pv, childrenPv);
                 bestMove = move;
                 alpha = score; 
             }
+            bestScore = score;
         }
     }
     /*                 */
 
     /* Checkmate and Stalemate Detection */
-    if (bestScore == -INFINITE) { // Something is always better than nothing, so bestScore stays -INFINITE if it couldn't play any move
+    if (bestScore == -INFINITE) {
         sh->pv[0] = NO_MOVE; // TODO: Likely clean this up
-        bestScore = board->checkers ? CHECKMATED - depth : DRAW; // TODO: Should this be considered EXACT bound?
+        bestScore = getCheckers(board) ? -CHECKMATE + board->ply : DRAW; // TODO: Should this be considered EXACT bound? Ply should be relative to root rather than game
     }
     /*                                   */
 
-    //savePositionEvaluation(pe, board->positionKey, bestMove, depth, bestMove != NO_MOVE ? EXACT : UPPER, bestScore);
-    return bestScore; // Fail Soft
+    //savePositionEvaluation(pe, board->history->positionKey, bestMove, depth, bestMove != NO_MOVE ? EXACT : UPPER, bestScore);
+    return bestScore;
 }
 
 MoveObject startSearch(ChessBoard *board, int depth) {
