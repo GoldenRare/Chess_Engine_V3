@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <stdio.h>
 #include <time.h>
 #include "search.h"
@@ -9,6 +10,7 @@
 
 typedef struct SearchHelper {
     Move* pv; // The Principal Variation
+    uint8_t ply;
 } SearchHelper;
 
 static inline void updatePrincipalVariation(Move m, Move *currentPv, const Move *childrenPv) {
@@ -29,19 +31,20 @@ static void encodePrincipalVariation(char* buffer, const Move *pv) {
     buffer[spaceIndex] = '\0';
 }
 
-static Score quiescenceSearch(ChessBoard *restrict board, Score alpha, Score beta) {
+static Score quiescenceSearch(ChessBoard *restrict board, Score alpha, Score beta, SearchHelper *restrict sh) {
 
     if (isDraw(board)) return DRAW;
     
     Bitboard checkers = getCheckers(board);
-    /* Stand Pat */ // TODO: Ply should be relative to root rather than game
-    Score bestScore = checkers ? -CHECKMATE + board->ply : evaluation(board->sideToMove); // TODO: Could be evaluating a stalemate
+    /* Stand Pat */
+    Score bestScore = checkers ? -CHECKMATE + sh->ply : evaluation(board->sideToMove); // TODO: Could be evaluating a stalemate
     if (bestScore > alpha) {
         if (bestScore >= beta) return bestScore; 
         alpha = bestScore;
     }
     /*           */
 
+    uint8_t ply = sh->ply;
     /* Main Moves Loop */
     ChessBoardHistory history;
     MoveSelector ms;
@@ -51,10 +54,12 @@ static Score quiescenceSearch(ChessBoard *restrict board, Score alpha, Score bet
     Move move;
     while ((move = getNextBestMove(board, &ms))) {
         if (!isLegalMove(board, move)) continue;
+        sh->ply = ply + 1;
         makeMove(board, &history, move);
-        Score score = -quiescenceSearch(board, -beta, -alpha);
+        Score score = -quiescenceSearch(board, -beta, -alpha, sh);
         undoMove(board, move);
-
+        sh->ply = ply;
+        
         if (score > bestScore) {
             if (score > alpha) {
                 if (score >= beta) return score;
@@ -67,21 +72,22 @@ static Score quiescenceSearch(ChessBoard *restrict board, Score alpha, Score bet
     return bestScore;
 }
 
-static Score alphaBeta(ChessBoard *restrict board, Score alpha, Score beta, Depth depth, SearchHelper *sh, bool isRootNode) {
+static Score alphaBeta(ChessBoard *restrict board, Score alpha, Score beta, Depth depth, SearchHelper *restrict sh, bool isRootNode) {
 
     /* Quiescence Search */
-    if (!depth) return quiescenceSearch(board, alpha, beta);
+    if (!depth) return quiescenceSearch(board, alpha, beta, sh);
     /*                   */
 
     if (isDraw(board)) return DRAW;
 
+    Key positionKey = getPositionKey(board);
     /* Transposition Table */
     /*bool hasEvaluation;
-    PositionEvaluation *pe = probeTranspositionTable(board->history->positionKey, &hasEvaluation);
+    PositionEvaluation *pe = probeTranspositionTable(positionKey, &hasEvaluation);
     Move ttMove = NO_MOVE;
     if (hasEvaluation) {
         Bound bound = getBound(pe);
-        int nodeScore = pe->nodeScore;
+        Score nodeScore = adjustNodeScoreFromTT(pe->nodeScore, sh->ply);
         if (pe->depth >= depth && !isRootNode) { // Do not terminate early if root node so that we can at least report one move in the pv for 'info string'
             // TODO: Consider optimizing the below and need to adjust node score
             if ((bound == LOWER && nodeScore >= beta) || (bound == UPPER && nodeScore <= alpha) || bound == EXACT) {
@@ -94,6 +100,7 @@ static Score alphaBeta(ChessBoard *restrict board, Score alpha, Score beta, Dept
 
     /* Main Moves Loop */
     Move childrenPv[depth];
+    sh[1].ply = sh->ply + 1;
     sh[1].pv = childrenPv;
     childrenPv[0] = NO_MOVE;
 
@@ -113,8 +120,8 @@ static Score alphaBeta(ChessBoard *restrict board, Score alpha, Score beta, Dept
         if (score > bestScore) {
             if (score > alpha) {
                 if (score >= beta) {
-                    //savePositionEvaluation(pe, board->history->positionKey, move, depth, LOWER, score);
-                    return score; // Fail Soft
+                    //savePositionEvaluation(pe, positionKey, move, depth, LOWER, adjustNodeScoreToTT(score, sh->ply));
+                    return score;
                 }
                 updatePrincipalVariation(move, sh->pv, childrenPv);
                 bestMove = move;
@@ -128,17 +135,19 @@ static Score alphaBeta(ChessBoard *restrict board, Score alpha, Score beta, Dept
     /* Checkmate and Stalemate Detection */
     if (bestScore == -INFINITE) {
         sh->pv[0] = NO_MOVE; // TODO: Likely clean this up
-        bestScore = getCheckers(board) ? -CHECKMATE + board->ply : DRAW; // TODO: Should this be considered EXACT bound? Ply should be relative to root rather than game
+        bestScore = getCheckers(board) ? -CHECKMATE + sh->ply : DRAW; // TODO: Should this be considered EXACT bound?
     }
     /*                                   */
 
-    //savePositionEvaluation(pe, board->history->positionKey, bestMove, depth, bestMove != NO_MOVE ? EXACT : UPPER, bestScore);
+    //savePositionEvaluation(pe, positionKey, bestMove, depth, bestMove != NO_MOVE ? EXACT : UPPER, adjustNodeScoreToTT(bestScore, sh->ply));
     return bestScore;
 }
 
-MoveObject startSearch(ChessBoard *board, int depth) {
-    SearchHelper sh[MAX_DEPTH + 1]; //TODO: SIZE
+MoveObject startSearch(ChessBoard *restrict board, Depth depth) {
+    startNewSearch();
+    SearchHelper sh[MAX_DEPTH + 1];
     Move pv[MAX_DEPTH + 1];
+    sh[0].ply = 0;
     sh[0].pv = pv;
     pv[0] = NO_MOVE;
     
