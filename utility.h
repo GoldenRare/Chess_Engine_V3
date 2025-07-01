@@ -7,8 +7,8 @@
 typedef uint64_t Bitboard;
 typedef uint64_t Key;
 typedef uint16_t Move;
+typedef uint8_t Depth;
 
-typedef int32_t Depth;
 typedef int32_t Score; // TODO: Could be the Value enum
 
 typedef struct MoveObject {
