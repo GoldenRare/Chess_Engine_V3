@@ -8,6 +8,7 @@
 #include "utility.h"
 #include "search.h"
 #include "transposition_table.h"
+#include "training.h"
 
 // Official UCI Commands
 constexpr char GO        [] = "go"       ;
@@ -133,6 +134,10 @@ static void benchmark() {
     fclose(perftFile);
 }
 
+static void train() {
+    startTraining();
+}
+
 void processMoves(ChessBoard *board) {
     char *moveStr;
     while ((moveStr = strtok(NULL, " ")) != NULL) {
@@ -175,5 +180,6 @@ void uciLoop() {
 
         // Unofficial UCI Commands
         else if (strcmp(token, BENCHMARK) == 0) benchmark();
+        else if (strcmp(token, TRAIN)     == 0) train();
     }
 }

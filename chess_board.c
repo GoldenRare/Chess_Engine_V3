@@ -181,6 +181,7 @@ void parseFEN(ChessBoard *board, ChessBoardHistory *history, const char *restric
         ['-'] = 0
     };
 
+    resetAccumulator(); // TODO: Could this be done somewhere else?
     board->history = history;
     /* 1) Piece Placement */
     Square sq = A8;

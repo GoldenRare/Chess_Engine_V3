@@ -23,7 +23,7 @@ static Network network; // TODO: Can we make it const?
 typedef struct Accumulator {
     int16_t accumulator[COLOURS][LAYER1];
 } Accumulator;
-static Accumulator accumulator; // TODO: Confirm static auto 0s memory
+static Accumulator accumulator;
 
 static inline int32_t SCReLU(int16_t val) {
     return val >= QUANTIZATION_A ? QUANTIZATION_A * QUANTIZATION_A 
@@ -34,11 +34,14 @@ static inline int32_t SCReLU(int16_t val) {
 void initializeNNUE() {
     FILE *file = fopen("temp.bin", "rb");
     fread(&network, sizeof(Network), 1 , file);
-    for (int i = 0; i < LAYER1; i++) {
-        accumulator.accumulator[WHITE][i] += network.accumulatorBiases[i];
-        accumulator.accumulator[BLACK][i] += network.accumulatorBiases[i];
-    }
     fclose(file);
+}
+
+void resetAccumulator() {
+    for (int i = 0; i < LAYER1; i++) {
+        accumulator.accumulator[WHITE][i] = network.accumulatorBiases[i];
+        accumulator.accumulator[BLACK][i] = network.accumulatorBiases[i];
+    }
 }
 
 void accumulatorAdd(Colour c, PieceType pt, Square sq) {

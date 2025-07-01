@@ -5,6 +5,7 @@
 
 void initializeNNUE();
 
+void resetAccumulator();
 // Adds a piece to the accumulator, always using the perspective of white.
 void accumulatorAdd(Colour c, PieceType pt, Square sq);
 // Removes a piece from the accumulator, always using the perspective of white.
