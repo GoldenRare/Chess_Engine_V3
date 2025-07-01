@@ -61,19 +61,24 @@ static inline Square getKingSquare(const ChessBoard *restrict board, Colour c) {
 // TODO: Stalemate
 // TODO: Null pointer checks needed if the previous positions are not there such as setting FEN to not start
 static inline bool isDraw(const ChessBoard *restrict board) {
-    /*// Twofold repetition
-    if (board->history->halfmoveClock >= 4) {
+    /*if (board->history->halfmoveClock >= 8) {
         Key current = getPositionKey(board);
         ChessBoardHistory *previous = board->history->previous->previous->previous->previous;
-        if (current == previous->positionKey) return true;
+        int repetitions = current == previous->positionKey ? 2 : 1;
         int count = previous->halfmoveClock;
         while (count >= 2) {
             previous = previous->previous->previous;
-            if (current == previous->positionKey) return true;
+            if (current == previous->positionKey && ++repetitions == 3) return true;
             count -= 2;
         }
     }*/
     return board->history->halfmoveClock > 100;
+}
+
+// Clears the board, but DOES NOT recursively clear the ChessBoardHistory, only clears the first one.
+static inline void clearBoard(ChessBoard *restrict board) {
+    *board->history = (ChessBoardHistory) {0};
+    *board          = (ChessBoard       ) {0};
 }
 
 static inline bool isPathClear(Square from, Square to, Bitboard occupied) {
