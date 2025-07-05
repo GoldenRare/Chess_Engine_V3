@@ -1,7 +1,13 @@
 #ifndef TRAINING_H
 #define TRAINING_H
 
-void initializeTraining();
-void startTraining();
+#include <stdio.h>
+
+typedef struct TrainingThread {
+    FILE *file;
+    bool stop;
+} TrainingThread;
+
+void* startTraining(void* trainingThread);
 
 #endif
