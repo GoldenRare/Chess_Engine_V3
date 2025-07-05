@@ -1,3 +1,4 @@
+#include <stddef.h>
 #include <stdint.h>
 #include <time.h>
 #include <stdio.h>
@@ -25,10 +26,11 @@ constexpr char TRAIN    [] = "train"    ;
 
 /* TODO */
 typedef struct Configuration {
+    size_t hashSize;
     uint8_t threads;
 } Configuration;
 
-static Configuration configurations;
+static Configuration configurations = {.hashSize = 256, .threads = 1};
 static TrainingThread tt[32];
 /*      */
 
@@ -55,7 +57,7 @@ static void go(ChessBoard *restrict board) {
         else if (strcmp(token, movetime) == 0);
         else if (strcmp(token, infinite) == 0)
         ;
-    startSearch(board, searchDepth);
+    startSearch(board, searchDepth, nullptr);
 }
 
 static void isReady() {
@@ -110,7 +112,7 @@ static void setOption() {
     char *token = strtok(nullptr, " ");
     strtok(nullptr, " "); // Discard value string
 
-    if      (strcmp(token, Hash  ) == 0) setTranspositionTableSize(strtoull(strtok(nullptr, " "), nullptr, 10));
+    if      (strcmp(token, Hash  ) == 0) configurations.hashSize = strtoull(strtok(nullptr, " "), nullptr, 10);
     else if (strcmp(token, Thread) == 0) configurations.threads = strtoul(strtok(nullptr, " "), nullptr, 10) - 1;
 }
 
@@ -118,14 +120,14 @@ static void uci() {
     puts("id name GoldenRareBOT V3");
     puts("id author Deshawn Mohan");
     puts("option name Hash type spin default 256 min x max y"); // TODO
-    puts("option name Thread type spin default 1 min x max y"); // TODO
+    puts("option name Thread type spin default 2 min 2 max y"); // TODO
     puts("uciok");
 }
 
 static uint64_t perft(ChessBoard *restrict board, Depth depth) {
     uint64_t nodes = 0;
     ChessBoardHistory history;
-    MoveObject moveList[256];
+    MoveObject moveList[MAX_MOVES];
     MoveObject *endList = createMoveList(board, moveList, CAPTURES);
     endList = createMoveList(board, endList, NON_CAPTURES);
     if (depth == 1)
@@ -172,6 +174,7 @@ static void train() {
     for (int i = 0; i < configurations.threads; i++) {
         tt[i].file = fopen("training_data.txt", "a"); // TODO
         tt[i].stop = false;
+        setTranspositionTableSize(&tt[i].st.tt, configurations.hashSize);
         pthread_create(&tt[i].th, nullptr, startTraining, &tt);
     }
 }
@@ -180,6 +183,7 @@ static void stopThreads() {
     for (int i = 0; i < configurations.threads; i++) {
         if (!tt[i].th) return;
         tt[i].stop = true;
+        // TODO: tt table
         pthread_join(tt[i].th, nullptr);
         fclose(tt[i].file);
     }
