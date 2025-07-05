@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <pthread.h>
 #include "chess_board.h"
 #include "move_generator.h"
 #include "utility.h"
@@ -20,8 +21,16 @@ constexpr char UCI       [] = "uci"      ;
 
 // Unofficial UCI Commands
 constexpr char BENCHMARK[] = "benchmark";
-constexpr char PERFT    [] = "perft"    ;
 constexpr char TRAIN    [] = "train"    ;
+
+/* TODO */
+typedef struct Configuration {
+    uint8_t threads;
+} Configuration;
+
+static Configuration configurations;
+static TrainingThread tt[32];
+/*      */
 
 static void go(ChessBoard *restrict board) {
     constexpr char depth[] = "depth";
@@ -53,39 +62,63 @@ static void isReady() {
     puts("readyok");
 }
 
+void processMoves(ChessBoard *board) {
+    char *moveStr;
+    while ((moveStr = strtok(NULL, " ")) != NULL) {
+        MoveObject moveList[MAX_MOVES];
+        MoveObject *endList = createMoveList(board, moveList, CAPTURES); // TODO
+        char moveToName[6] = "";
+        for (MoveObject *startList = moveList; startList < endList; startList++) {
+            moveToString(moveToName, startList->move);
+            if (strcmp(moveStr, moveToName) == 0) {
+                ChessBoardHistory history;
+                makeMove(board, &history, startList->move);
+                break;
+            }
+        }
+    }
+}
+
 //position startpos moves e2e4 e7e5 g1f3 b8c6 f1b5 a7a6 b5a4 g8f6 e1g1 f8e7 d2d3 b7b5 a4b3 d7d6 c2c3 e8g8 b1d2 c8g4 h2h3 g4h5 a2a4 b5b4 c3c4 f6d7 b3c2 f7f5
 //position fen 7k/5P2/8/8/8/8/8/7K w - - 0 1 moves f7f8q h8h7 f8b4 h7g7 h1g2 g7f6 b4d2
 //position fen 4q2k/5P2/8/8/8/8/8/7K w - - 0 1 moves f7e8q h8g7
 static void position(ChessBoard *restrict board) {
-    constexpr char fen  [] = "fen";
-    constexpr char moves[] = "moves";
+    constexpr char fen[] = "fen";
 
     char *token = strtok(nullptr, " ");
     char *fenStart = nullptr;
     if (strcmp(token, fen) == 0) {
         fenStart = token = token + 4;
-        while (*++token) if (*token == 'm') *--token = '\0';
+        while (*++token) 
+            if (*token == 'm') {
+                *(token - 1) = '\0';
+                break;
+            }
     }
     ChessBoardHistory *history = board->history;
     clearBoard(board);
     parseFEN(board, history, fenStart ? fenStart : START_POS);
-    //if (token != NULL && strcmp(token, moves) == 0) processMoves(board);
+    //if ((*token == 'm') || *(token = token + 9) == 'm') processMoves(board);
 }
 
 static void setOption() {
-    constexpr char Hash[] = "Hash";
+    constexpr char Hash  [] = "Hash"  ;
+    constexpr char Thread[] = "Thread";
+
     
     strtok(nullptr, " "); // Discard name string
     char *token = strtok(nullptr, " ");
     strtok(nullptr, " "); // Discard value string
 
-    if (strcmp(token, Hash) == 0) setTranspositionTableSize(strtoull(strtok(nullptr, " "), nullptr, 10));
+    if      (strcmp(token, Hash  ) == 0) setTranspositionTableSize(strtoull(strtok(nullptr, " "), nullptr, 10));
+    else if (strcmp(token, Thread) == 0) configurations.threads = strtoul(strtok(nullptr, " "), nullptr, 10) - 1;
 }
 
 static void uci() {
     puts("id name GoldenRareBOT V3");
     puts("id author Deshawn Mohan");
     puts("option name Hash type spin default 256 min x max y"); // TODO
+    puts("option name Thread type spin default 1 min x max y"); // TODO
     puts("uciok");
 }
 
@@ -116,6 +149,7 @@ static void benchmark() {
 
     double totalTime = 0.001; // TODO: Non ideal way to guard divide by 0 below
     uint64_t actualNodes = 0, expectedNodes = 0;
+    printf("info string benchmark starting, depth: %u\n", depth);
     while (fgets(line, sizeof(line), perftFile)) {
         ChessBoard board = {0};
         ChessBoardHistory history = {0};
@@ -125,35 +159,29 @@ static void benchmark() {
         actualNodes += perft(&board, depth);
         totalTime += (double) (clock() - start) / CLOCKS_PER_SEC;
         
-        for (int i = 0; i < depth - 1; i++) strtok(NULL, ",");
-        expectedNodes += strtoull(strtok(NULL, ","), NULL, 10);
+        for (int i = 0; i < depth - 1; i++) strtok(nullptr, ",");
+        expectedNodes += strtoull(strtok(nullptr, ","), nullptr, 10);
     }
 
-    printf("info string BENCHMARK %s\n", actualNodes == expectedNodes ? "PASSED" : "FAILED");
-    printf("info depth %d time %.0lf nodes %llu nps %.0lf\n", depth, totalTime * 1000.0, actualNodes, actualNodes / totalTime);
+    printf("info string benchmark %s, expected positions: %llu, positions got: %llu\n", expectedNodes == actualNodes ? "passed" : "failed", expectedNodes, actualNodes);
+    printf("info string total time: %.2lf sec, positions/sec: %.0lf\n", totalTime, actualNodes / totalTime);
     fclose(perftFile);
 }
 
 static void train() {
-    startTraining();
+    for (int i = 0; i < configurations.threads; i++) {
+        tt[i].file = fopen("training_data.txt", "a"); // TODO
+        tt[i].stop = false;
+        pthread_create(&tt[i].th, nullptr, startTraining, &tt);
+    }
 }
 
-void processMoves(ChessBoard *board) {
-    char *moveStr;
-    while ((moveStr = strtok(NULL, " ")) != NULL) {
-        MoveObject moveList[MAX_MOVES];
-        MoveObject *endList = createMoveList(board, moveList, CAPTURES); // TODO
-        char moveToName[6] = "";
-        for (MoveObject *startList = moveList; startList < endList; startList++) {
-            MoveType moveType = getMoveType(startList->move);
-            char promotionPiece = moveType & PROMOTION ? PROMOTION_NAME[moveType & PROMOTION_PIECE_OFFSET_MASK] : '\0';
-            encodeChessMove(moveToName, SQUARE_NAME[getFromSquare(startList->move)], SQUARE_NAME[getToSquare(startList->move)], promotionPiece);
-            if (strcmp(moveStr, moveToName) == 0) {
-                ChessBoardHistory history;
-                makeMove(board, &history, startList->move);
-                break;
-            }
-        }
+static void stopThreads() {
+    for (int i = 0; i < configurations.threads; i++) {
+        if (!tt[i].th) return;
+        tt[i].stop = true;
+        pthread_join(tt[i].th, nullptr);
+        fclose(tt[i].file);
     }
 }
 
@@ -180,6 +208,7 @@ void uciLoop() {
 
         // Unofficial UCI Commands
         else if (strcmp(token, BENCHMARK) == 0) benchmark();
-        else if (strcmp(token, TRAIN)     == 0) train();
+        else if (strcmp(token, TRAIN    ) == 0) train();
     }
+    stopThreads();
 }

@@ -105,6 +105,5 @@ static void playRandomGame(FILE *restrict file) {
 void* startTraining(void *trainingThread) {
     TrainingThread *tt = trainingThread;
     while (!tt->stop) playRandomGame(tt->file);
-    fclose(tt->file); // TODO
     return nullptr;
 }
