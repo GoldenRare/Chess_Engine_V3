@@ -66,7 +66,7 @@ static Score quiescenceSearch(ChessBoard *restrict board, Score alpha, Score bet
     return bestScore;
 }
 
-static Score alphaBeta(ChessBoard *restrict board, Score alpha, Score beta, Depth depth, SearchHelper *restrict sh, bool isRootNode) {
+static Score alphaBeta(ChessBoard *restrict board, Score alpha, Score beta, Depth depth, SearchHelper *restrict sh, bool isRootNode, SearchThread *st) {
     sh->pv[0] = NO_MOVE;
 
     /* 1) Quiescence Search */
@@ -80,7 +80,7 @@ static Score alphaBeta(ChessBoard *restrict board, Score alpha, Score beta, Dept
     /* 3) Transposition Table */
     Key positionKey = getPositionKey(board);
     bool hasEvaluation;
-    PositionEvaluation *pe = probeTranspositionTable(positionKey, &hasEvaluation);
+    PositionEvaluation *pe = probeTranspositionTable(st->tt, positionKey, &hasEvaluation);
     Move ttMove = NO_MOVE;
     if (hasEvaluation) {
         // TODO: Do not terminate early if root node so that we can at least report one move in the pv for 'info string'
@@ -107,13 +107,13 @@ static Score alphaBeta(ChessBoard *restrict board, Score alpha, Score beta, Dept
     while ((move = getNextBestMove(board, &ms))) {
         if (!isLegalMove(board, move)) continue;
         makeMove(board, &history, move);
-        Score score = -alphaBeta(board, -beta, -alpha, depth - 1, child, false);
+        Score score = -alphaBeta(board, -beta, -alpha, depth - 1, child, false, st);
         undoMove(board, move);
 
         if (score > bestScore) {
             if (score > alpha) {
                 if (score >= beta) {
-                    savePositionEvaluation(pe, positionKey, move, depth, LOWER, adjustNodeScoreToTT(score, sh->ply));
+                    savePositionEvaluation(st->tt, pe, positionKey, move, depth, LOWER, adjustNodeScoreToTT(score, sh->ply));
                     return score;
                 }
                 updatePV(move, sh->pv, child->pv); // TODO: Only needs to be done once on the last score > alpha, but integrity is lost
@@ -129,12 +129,12 @@ static Score alphaBeta(ChessBoard *restrict board, Score alpha, Score beta, Dept
     if (bestScore == -INFINITE) bestScore = getCheckers(board) ? -CHECKMATE + sh->ply : DRAW; // TODO: Should this be considered EXACT bound?
     /*                                   */
 
-    savePositionEvaluation(pe, positionKey, bestMove, depth, bestMove != NO_MOVE ? EXACT : UPPER, adjustNodeScoreToTT(bestScore, sh->ply));
+    savePositionEvaluation(st->tt, pe, positionKey, bestMove, depth, bestMove != NO_MOVE ? EXACT : UPPER, adjustNodeScoreToTT(bestScore, sh->ply));
     return bestScore;
 }
 
-MoveObject startSearch(ChessBoard *restrict board, Depth depth) {
-    startNewSearch();
+MoveObject startSearch(ChessBoard *restrict board, Depth depth, SearchThread *st) {
+    startNewSearch(st->tt);
     SearchHelper sh[MAX_DEPTH + 1];
     sh[0].ply = 0;
     
@@ -142,8 +142,8 @@ MoveObject startSearch(ChessBoard *restrict board, Depth depth) {
     double totalTime;
     int score = 0;
     clock_t start = clock();
-    for (int d = 1; d <= depth; d++) { // TODO: Experiment with different steps for iterative deepening
-        score = alphaBeta(board, -INFINITE, INFINITE, d, sh, true);
+    for (Depth d = 1; d <= depth; d++) { // TODO: Experiment with different steps for iterative deepening
+        score = alphaBeta(board, -INFINITE, INFINITE, d, sh, true, st);
         totalTime = (double) (clock() - start) / CLOCKS_PER_SEC;
 
         pvToString(pvString, sh[0].pv);
