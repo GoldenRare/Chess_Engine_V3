@@ -1,6 +1,7 @@
 #ifndef UTILITY_H
 #define UTILITY_H
 
+#include <stddef.h>
 #include <stdint.h>
 #include <immintrin.h>
 
@@ -42,10 +43,10 @@ typedef enum Square {
     SQUARES, NO_SQUARE
 } Square;
 
-typedef enum MoveType {
+typedef enum MoveType { // TODO
     QUIET, DOUBLE_PAWN_PUSH, CASTLE, EN_PASSANT = 4, PROMOTION = 8,
     KNIGHT_PROMOTION = 8, BISHOP_PROMOTION, ROOK_PROMOTION, QUEEN_PROMOTION,
-    PROMOTION_PIECE_OFFSET_MASK = 3
+    PROMOTION_PIECE_MASK = 3
 } MoveType;
 
 typedef enum Rank {
@@ -91,6 +92,16 @@ constexpr Bitboard A8_BB = FILE_A_BB & RANK_8_BB;
 constexpr Move NO_MOVE = 0;
 
 constexpr char START_POS[] = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+constexpr char SQUARE_NAME[][3] = {
+    "a8", "b8", "c8", "d8", "e8", "f8", "g8", "h8", 
+    "a7", "b7", "c7", "d7", "e7", "f7", "g7", "h7", 
+    "a6", "b6", "c6", "d6", "e6", "f6", "g6", "h6", 
+    "a5", "b5", "c5", "d5", "e5", "f5", "g5", "h5", 
+    "a4", "b4", "c4", "d4", "e4", "f4", "g4", "h4", 
+    "a3", "b3", "c3", "d3", "e3", "f3", "g3", "h3", 
+    "a2", "b2", "c2", "d2", "e2", "f2", "g2", "h2", 
+    "a1", "b1", "c1", "d1", "e1", "f1", "g1", "h1"
+};
 constexpr int MAX_MOVES = 256;
 
 static inline Rank squareToRank(Square sq) {
@@ -163,29 +174,45 @@ static inline uint64_t pext(uint64_t src, uint64_t mask) {
     return _pext_u64(src, mask);
 }
 
-// Random number generator derived from Stockfish, more precisely from Sebastiano Vigna (2014).
-static inline uint64_t random64BitNumber(uint64_t *seed) {
-    *seed ^= *seed >> 12, *seed ^= *seed << 25, *seed ^= *seed >> 27;
-    return *seed * 2685821657736338717LL;
-}
-
 static inline int max(int a, int b) {
     return a >= b ? a : b;
-}
-
-static inline void encodeChessMove(char *destination, const char *fromSquare, const char *toSquare, const char promotionPiece) {
-    destination[0] = fromSquare[0];
-    destination[1] = fromSquare[1];
-    destination[2] = toSquare[0];
-    destination[3] = toSquare[1];
-    destination[4] = promotionPiece; // This will most often be the null character if the move is no promotion
-    destination[5] = '\0';
 }
 
 static inline bool isAdjacentSquare(Square fromSq, Square toSq) {
     int rankDistance = abs((int) squareToRank(toSq) - (int) squareToRank(fromSq));
     int fileDistance = abs((int) squareToFile(toSq) - (int) squareToFile(fromSq));
     return max(rankDistance, fileDistance) == 1;
+}
+
+// A PRNG that can be found here: https://arxiv.org/pdf/1402.6246
+static inline uint64_t random64BitNumber(uint64_t *restrict seed) {
+    *seed ^= *seed >> 12, *seed ^= *seed << 25, *seed ^= *seed >> 27;
+    return *seed * 2685821657736338717ULL;
+}
+
+// A PRNG that can be found here: https://prng.di.unimi.it/splitmix64.c
+static inline uint64_t splitMix64(uint64_t *restrict seed) {
+	uint64_t z = *seed += 0x9E3779B97F4A7C15ULL;
+	z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ULL;
+	z = (z ^ (z >> 27)) * 0x94D049BB133111EBULL;
+	return z ^ (z >> 31);
+}
+
+// Returns the length of the string
+static inline size_t moveToString(char *restrict destination, Move move) {
+    constexpr char PROMOTION_PIECE[] = {'n', 'b', 'r', 'q'};
+    Square fromSquare = getFromSquare(move);
+    Square toSquare = getToSquare(move);
+    MoveType moveType = getMoveType(move);
+    bool isPromotion = moveType & PROMOTION;
+
+    destination[0] = SQUARE_NAME[fromSquare][0];
+    destination[1] = SQUARE_NAME[fromSquare][1];
+    destination[2] = SQUARE_NAME[toSquare  ][0];
+    destination[3] = SQUARE_NAME[toSquare  ][1];
+    destination[4] = isPromotion ? PROMOTION_PIECE[moveType & PROMOTION_PIECE_MASK] : '\0';
+    destination[5] = '\0';
+    return isPromotion ? 5 : 4;
 }
 
 #endif
