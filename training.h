@@ -1,15 +1,9 @@
 #ifndef TRAINING_H
 #define TRAINING_H
 
-#include <pthread.h>
-#include <stdio.h>
+#include "uci.h"
 
-typedef struct TrainingThread {
-    pthread_t th;
-    FILE *file;
-    bool stop;
-} TrainingThread;
-
-void* startTraining(void* trainingThread);
+void startTrainingThreads(const UCI_Configuration *restrict config);
+void stopTrainingThreads();
 
 #endif
