@@ -5,11 +5,12 @@
 #include <string.h>
 #include <stdlib.h>
 #include <pthread.h>
+#include <stdatomic.h>
+#include "uci.h"
 #include "chess_board.h"
 #include "move_generator.h"
 #include "utility.h"
 #include "search.h"
-#include "transposition_table.h"
 #include "training.h"
 
 // Official UCI Commands
@@ -24,15 +25,7 @@ constexpr char UCI       [] = "uci"      ;
 constexpr char BENCHMARK[] = "benchmark";
 constexpr char TRAIN    [] = "train"    ;
 
-/* TODO */
-typedef struct Configuration {
-    size_t hashSize;
-    uint8_t threads;
-} Configuration;
-
-static Configuration configurations = {.hashSize = 256, .threads = 1};
-static TrainingThread tt[32];
-/*      */
+static UCI_Configuration config = {.hashSize = 256, .threads = 1};
 
 static void go(ChessBoard *restrict board) {
     constexpr char depth[] = "depth";
@@ -112,8 +105,8 @@ static void setOption() {
     char *token = strtok(nullptr, " ");
     strtok(nullptr, " "); // Discard value string
 
-    if      (strcmp(token, Hash  ) == 0) configurations.hashSize = strtoull(strtok(nullptr, " "), nullptr, 10);
-    else if (strcmp(token, Thread) == 0) configurations.threads = strtoul(strtok(nullptr, " "), nullptr, 10) - 1;
+    if      (strcmp(token, Hash  ) == 0) config.hashSize = strtoull(strtok(nullptr, " "), nullptr, 10);
+    else if (strcmp(token, Thread) == 0) config.threads = strtoul(strtok(nullptr, " "), nullptr, 10) - 1;
 }
 
 static void uci() {
@@ -171,29 +164,14 @@ static void benchmark() {
 }
 
 static void train() {
-    for (int i = 0; i < configurations.threads; i++) {
-        tt[i].file = fopen("training_data.txt", "a"); // TODO
-        tt[i].stop = false;
-        setTranspositionTableSize(&tt[i].st.tt, configurations.hashSize);
-        pthread_create(&tt[i].th, nullptr, startTraining, &tt);
-    }
-}
-
-static void stopThreads() {
-    for (int i = 0; i < configurations.threads; i++) {
-        if (!tt[i].th) return;
-        tt[i].stop = true;
-        // TODO: tt table
-        pthread_join(tt[i].th, nullptr);
-        fclose(tt[i].file);
-    }
+    startTrainingThreads(&config);
 }
 
 void uciLoop() {
     ChessBoard board = {0};
     ChessBoardHistory history = {0};
     parseFEN(&board, &history, START_POS);
-    char input[512]; // Assumes input is large enough to hold '\n' from stdin
+    char input[1024]; // Assumes input is large enough to hold '\n' from stdin
     char *token = nullptr;
 
     while (!token || strcmp(token, QUIT) != 0) {
@@ -214,5 +192,5 @@ void uciLoop() {
         else if (strcmp(token, BENCHMARK) == 0) benchmark();
         else if (strcmp(token, TRAIN    ) == 0) train();
     }
-    stopThreads();
+    stopTrainingThreads();
 }
