@@ -6,17 +6,19 @@
 #include "uci.h"
 #include "chess_board.h"
 #include "move_generator.h"
+#include "transposition_table.h"
 #include "utility.h"
 #include "search.h"
 #include "training.h"
 
 // Official UCI Commands
-constexpr char GO        [] = "go"       ;
-constexpr char IS_READY  [] = "isready"  ;
-constexpr char POSITION  [] = "position" ;
-constexpr char QUIT      [] = "quit"     ;
-constexpr char SET_OPTION[] = "setoption";
-constexpr char UCI       [] = "uci"      ;
+constexpr char GO          [] = "go"        ;
+constexpr char IS_READY    [] = "isready"   ;
+constexpr char POSITION    [] = "position"  ;
+constexpr char QUIT        [] = "quit"      ;
+constexpr char SET_OPTION  [] = "setoption" ;
+constexpr char UCI         [] = "uci"       ;
+constexpr char UCI_NEW_GAME[] = "ucinewgame";
 
 // Unofficial UCI Commands
 constexpr char BENCHMARK[] = "benchmark";
@@ -27,7 +29,7 @@ static UCI_Configuration config = {.hashSize = 256, .threads = 1};
 
 static ChessBoardHistory temp[256]; // TODO
 
-static void go(ChessBoard *restrict board) {
+static void go(ChessBoard *restrict board, SearchThread *restrict st) {
     constexpr char depth[] = "depth";
     // TODO: Options to potentially implement. All times are in msec
     constexpr char wtime   [] = "wtime"   ;
@@ -50,7 +52,7 @@ static void go(ChessBoard *restrict board) {
         else if (strcmp(token, movetime) == 0);
         else if (strcmp(token, infinite) == 0)
         ;
-    startSearch(board, searchDepth, nullptr);
+    startSearch(board, searchDepth, st);
 }
 
 static void isReady() {
@@ -171,10 +173,19 @@ static void train() {
     startTrainingThreads(&config);
 }
 
+static void uciNewGame(SearchThread *restrict st) {
+    clearTranspositionTable(&st->tt);
+}
+
 void uciLoop() {
+    /* Stack Initialization */
     ChessBoard board = {0};
     ChessBoardHistory history = {0};
+    SearchThread st;
+    createSearchThread(&st, 256, true);
     parseFEN(&board, &history, START_POS);
+    /*                      */
+
     char input[1024]; // Assumes input is large enough to hold '\n' from stdin
     char *token = nullptr;
 
@@ -186,11 +197,12 @@ void uciLoop() {
         if (!token) continue;
 
         // Official UCI Commands
-        if      (strcmp(token, GO        ) == 0) go(&board);
-        else if (strcmp(token, IS_READY  ) == 0) isReady();
-        else if (strcmp(token, POSITION  ) == 0) position(&board);
-        else if (strcmp(token, SET_OPTION) == 0) setOption();
-        else if (strcmp(token, UCI       ) == 0) uci();
+        if      (strcmp(token, GO          ) == 0) go(&board, &st);
+        else if (strcmp(token, IS_READY    ) == 0) isReady();
+        else if (strcmp(token, POSITION    ) == 0) position(&board);
+        else if (strcmp(token, SET_OPTION  ) == 0) setOption();
+        else if (strcmp(token, UCI         ) == 0) uci();
+        else if (strcmp(token, UCI_NEW_GAME) == 0) uciNewGame(&st);
 
         // Unofficial UCI Commands
         else if (strcmp(token, BENCHMARK) == 0) benchmark();
