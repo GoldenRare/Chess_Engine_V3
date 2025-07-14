@@ -1,11 +1,8 @@
-#include <stddef.h>
 #include <stdint.h>
 #include <time.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include <pthread.h>
-#include <stdatomic.h>
 #include "uci.h"
 #include "chess_board.h"
 #include "move_generator.h"
@@ -25,7 +22,10 @@ constexpr char UCI       [] = "uci"      ;
 constexpr char BENCHMARK[] = "benchmark";
 constexpr char TRAIN    [] = "train"    ;
 
+// Default configuration
 static UCI_Configuration config = {.hashSize = 256, .threads = 1};
+
+static ChessBoardHistory temp[256]; // TODO
 
 static void go(ChessBoard *restrict board) {
     constexpr char depth[] = "depth";
@@ -42,10 +42,10 @@ static void go(ChessBoard *restrict board) {
     char *token;
     while ((token = strtok(nullptr, " ")))
         if      (strcmp(token, depth   ) == 0) searchDepth = strtoul(strtok(nullptr, " "), nullptr, 10);
-        else if (strcmp(token, wtime   ) == 0);
-        else if (strcmp(token, btime   ) == 0);
-        else if (strcmp(token, winc    ) == 0);
-        else if (strcmp(token, binc    ) == 0);
+        else if (strcmp(token, wtime   ) == 0) strtok(nullptr, " ");
+        else if (strcmp(token, btime   ) == 0) strtok(nullptr, " ");
+        else if (strcmp(token, winc    ) == 0) strtok(nullptr, " ");
+        else if (strcmp(token, binc    ) == 0) strtok(nullptr, " ");
         else if (strcmp(token, nodes   ) == 0);
         else if (strcmp(token, movetime) == 0);
         else if (strcmp(token, infinite) == 0)
@@ -57,17 +57,18 @@ static void isReady() {
     puts("readyok");
 }
 
-void processMoves(ChessBoard *board) {
+static void processMoves(ChessBoard *restrict board) {
     char *moveStr;
-    while ((moveStr = strtok(NULL, " ")) != NULL) {
+    int i = 0;
+    while ((moveStr = strtok(nullptr, " "))) {
         MoveObject moveList[MAX_MOVES];
-        MoveObject *endList = createMoveList(board, moveList, CAPTURES); // TODO
-        char moveToName[6] = "";
+        MoveObject *endList = createMoveList(board, moveList, CAPTURES);
+        endList = createMoveList(board, endList, NON_CAPTURES);
+        char moveToName[6];
         for (MoveObject *startList = moveList; startList < endList; startList++) {
             moveToString(moveToName, startList->move);
             if (strcmp(moveStr, moveToName) == 0) {
-                ChessBoardHistory history;
-                makeMove(board, &history, startList->move);
+                makeMove(board, &temp[i++], startList->move);
                 break;
             }
         }
@@ -93,27 +94,30 @@ static void position(ChessBoard *restrict board) {
     ChessBoardHistory *history = board->history;
     clearBoard(board);
     parseFEN(board, history, fenStart ? fenStart : START_POS);
-    //if ((*token == 'm') || *(token = token + 9) == 'm') processMoves(board);
+    if ((*token == 'm') || *(token = token + 9) == 'm') {
+        strtok(token, " ");
+        processMoves(board);
+    }
 }
 
 static void setOption() {
-    constexpr char Hash  [] = "Hash"  ;
-    constexpr char Thread[] = "Thread";
+    constexpr char Hash   [] = "Hash"   ;
+    constexpr char Threads[] = "Threads";
 
     
     strtok(nullptr, " "); // Discard name string
     char *token = strtok(nullptr, " ");
     strtok(nullptr, " "); // Discard value string
 
-    if      (strcmp(token, Hash  ) == 0) config.hashSize = strtoull(strtok(nullptr, " "), nullptr, 10);
-    else if (strcmp(token, Thread) == 0) config.threads = strtoul(strtok(nullptr, " "), nullptr, 10) - 1;
+    if      (strcmp(token, Hash   ) == 0) config.hashSize = strtoull(strtok(nullptr, " "), nullptr, 10);
+    else if (strcmp(token, Threads) == 0) config.threads = strtoul(strtok(nullptr, " "), nullptr, 10) - 1;
 }
 
 static void uci() {
     puts("id name GoldenRareBOT V3");
     puts("id author Deshawn Mohan");
     puts("option name Hash type spin default 256 min x max y"); // TODO
-    puts("option name Thread type spin default 2 min 2 max y"); // TODO
+    puts("option name Threads type spin default 2 min 2 max 255");
     puts("uciok");
 }
 
