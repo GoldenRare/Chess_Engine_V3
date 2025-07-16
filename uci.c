@@ -22,6 +22,7 @@ constexpr char UCI_NEW_GAME[] = "ucinewgame";
 
 // Unofficial UCI Commands
 constexpr char BENCHMARK[] = "benchmark";
+constexpr char FEN      [] = "fen"      ;
 constexpr char TRAIN    [] = "train"    ;
 
 // Default configuration
@@ -118,9 +119,13 @@ static void setOption() {
 static void uci() {
     puts("id name GoldenRareBOT V3");
     puts("id author Deshawn Mohan");
-    puts("option name Hash type spin default 256 min x max y"); // TODO
+    puts("option name Hash type spin default 256 min 128 max 1024"); // TODO
     puts("option name Threads type spin default 2 min 2 max 255");
     puts("uciok");
+}
+
+static void uciNewGame(SearchThread *restrict st) {
+    clearTranspositionTable(&st->tt);
 }
 
 static uint64_t perft(ChessBoard *restrict board, Depth depth) {
@@ -169,12 +174,14 @@ static void benchmark() {
     fclose(perftFile);
 }
 
-static void train() {
-    startTrainingThreads(&config);
+static void fen(const ChessBoard *restrict board) {
+    char fen[128];
+    getFEN(board, fen);
+    puts(fen);
 }
 
-static void uciNewGame(SearchThread *restrict st) {
-    clearTranspositionTable(&st->tt);
+static void train() {
+    startTrainingThreads(&config);
 }
 
 void uciLoop() {
@@ -186,13 +193,11 @@ void uciLoop() {
     parseFEN(&board, &history, START_POS);
     /*                      */
 
-    char input[1024]; // Assumes input is large enough to hold '\n' from stdin
+    char input[2048]; // Assumes input is large enough to hold '\n' from stdin
     char *token = nullptr;
-
     while (!token || strcmp(token, QUIT) != 0) {
         fgets(input, sizeof(input), stdin);
         input[strlen(input) - 1] = '\0';
-
         token = strtok(input, " ");
         if (!token) continue;
 
@@ -206,6 +211,7 @@ void uciLoop() {
 
         // Unofficial UCI Commands
         else if (strcmp(token, BENCHMARK) == 0) benchmark();
+        else if (strcmp(token, FEN      ) == 0) fen(&board);
         else if (strcmp(token, TRAIN    ) == 0) train();
     }
     stopTrainingThreads();
