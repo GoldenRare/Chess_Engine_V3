@@ -91,8 +91,8 @@ static void playRandomMoves(ChessBoard *board, ChessBoardHistory *history, Train
 static void playGame(ChessBoard *restrict board, GameData *restrict previous, TrainingThread *tt) {
     ChessBoardHistory history;
     GameData current;
-    MoveObject bestMove = startSearch(board, 3, &tt->st);
-    if (!getCheckers(board) && !isCheckmate(bestMove.score)) { // TODO: What positions to save?
+    MoveObject bestMove = startSearch(board, 5, &tt->st);
+    if (!getCheckers(board) && !isCheckmate(bestMove.score) && !insufficientMaterial(board)) { // TODO: What positions to save?
         createGameData(&current, previous, board, bestMove.score);
         previous = &current;
     }
@@ -129,16 +129,26 @@ static void* startTraining(void *trainingThread) {
 }
 
 static void startTrainingThread(TrainingThread *restrict tthr, size_t hashSizeMB, uint64_t seed, const char *restrict filename) {
-    createSearchThread(&tthr->st, hashSizeMB);
+    createSearchThread(&tthr->st, hashSizeMB, false);
     tthr->seed = seed;
-    tthr->file = fopen(filename, "a");
+    tthr->file = fopen(filename, "ab+");
     pthread_create(&tthr->id, nullptr, startTraining, tthr);
 }
 
-static void stopTrainingThread(TrainingThread *tthr) {
+static void stopTrainingThread(TrainingThread *tthr, FILE *restrict merge, int thIndex) {
     pthread_join(tthr->id, nullptr);
     destroySearchThread(&tthr->st);
+    fflush(tthr->file);
+    rewind(tthr->file);
+
+    size_t read;
+    char data[2048];
+    while ((read = fread(data, sizeof(data[0]), sizeof(data), tthr->file)))
+        fwrite(data, sizeof(data[0]), read, merge);
+
     fclose(tthr->file);
+    snprintf(data, sizeof(data), "training_data%02d.txt", thIndex);
+    remove(data);
 }
 
 void startTrainingThreads(const UCI_Configuration *restrict config) {
@@ -159,10 +169,12 @@ void startTrainingThreads(const UCI_Configuration *restrict config) {
 
 void stopTrainingThreads() {
     atomic_store(&stop, true); // TODO: Memory Order
+    FILE *merge = fopen("training_data.txt", "a");
     for (int i = 0; i < activeThreads; i++) {
         printf("info string stopping thread: %d\n", i);
-        stopTrainingThread(&tth[i]);
+        stopTrainingThread(&tth[i], merge, i);
         printf("info string thread: %d, stopped\n", i);
     }
+    fclose(merge);
     activeThreads = 0;
 }
