@@ -6,7 +6,7 @@
 #include "transposition_table.h"
 #include "utility.h"
 
-constexpr Depth MAX_DEPTH = 5;
+constexpr Depth MAX_DEPTH = 7;
 
 typedef struct SearchThread {
     TT tt;
