@@ -1,29 +1,26 @@
 #ifndef SEARCH_H
 #define SEARCH_H
 
-#include <stddef.h>
 #include "chess_board.h"
 #include "transposition_table.h"
+#include "uci.h"
 #include "utility.h"
 
-constexpr Depth MAX_DEPTH = 7;
+constexpr Depth MAX_DEPTH = 7; // TODO
 
 typedef struct SearchThread {
-    TT tt;
+    ChessBoard board;
+    TT *tt;
     bool print;
 } SearchThread;
 
-// When creating a new search thread, ensure that a call to destroySearchThread() is made when the thread is no longer needed
-static inline void createSearchThread(SearchThread *restrict st, size_t hashSize, bool print) {
-    createTranspositionTable(&st->tt, hashSize);
+static inline void createSearchThread(SearchThread *st, const ChessBoard *restrict board, TT *tt, bool print) {
+    st->board = *board; // TODO: The history pointer is a shallow copy, consider using a deep copy
+    st->tt = tt;
     st->print = print;
 }
 
-// Destroys a previously created search thread, ensure that a call to createSearchThread() is made before using this function
-static inline void destroySearchThread(SearchThread *st) {
-    destroyTranspositionTable(&st->tt);
-}
-
+void startSearchThreads(const UCI_Configuration *restrict config);
 MoveObject startSearch(ChessBoard *restrict board, Depth depth, SearchThread *st);
 
 #endif
