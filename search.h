@@ -4,9 +4,6 @@
 #include "chess_board.h"
 #include "transposition_table.h"
 #include "uci.h"
-#include "utility.h"
-
-constexpr Depth MAX_DEPTH = 7; // TODO
 
 typedef struct SearchThread {
     ChessBoard board;
@@ -20,7 +17,6 @@ static inline void createSearchThread(SearchThread *st, const ChessBoard *restri
     st->print = print;
 }
 
-void startSearchThreads(const UCI_Configuration *restrict config);
-MoveObject startSearch(ChessBoard *restrict board, Depth depth, SearchThread *st);
+void startSearchThreads(UCI_Configuration *restrict config);
 
 #endif

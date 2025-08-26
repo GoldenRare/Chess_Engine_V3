@@ -1,3 +1,5 @@
+#include <pthread.h>
+#include <stdatomic.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <time.h>
@@ -7,6 +9,9 @@
 #include "transposition_table.h"
 #include "move_selector.h"
 #include "nnue.h"
+
+constexpr Depth MAX_DEPTH = 255;
+static atomic_bool stop;
 
 typedef struct SearchHelper {
     Move pv[MAX_DEPTH]; // TODO: Is it worth saving space by making triangular?
@@ -25,13 +30,23 @@ static inline void pvToString(char *restrict destination, const Move *restrict p
     }
 }
 
+/*static inline uint64_t timeDiffMs(const struct timespec *restrict start, const struct timespec *restrict end) {
+    time_t diffsecs = end->tv_sec - start->tv_sec;
+    long   diffnano = end->tv_nsec - end->tv_nsec;
+    if (diffnano < 0) {
+        diffsecs--;
+        diffnano += 1000000000L;
+    }
+    return (long long)diffsecs * 1000LL + (long long)(diffnano / 1000000L);
+}*/
+
 static Score quiescenceSearch(ChessBoard *restrict board, Score alpha, Score beta, SearchHelper *restrict sh) {
 
     if (isDraw(board)) return DRAW;
     
     Bitboard checkers = getCheckers(board);
     /* Stand Pat */
-    Score bestScore = checkers ? -CHECKMATE + sh->ply : evaluation(board->sideToMove); // TODO: Could be evaluating a stalemate
+    Score bestScore = checkers ? -CHECKMATE + sh->ply : evaluation(&board->accumulator, board->sideToMove); // TODO: Could be evaluating a stalemate
     if (bestScore > alpha) {
         if (bestScore >= beta) return bestScore; 
         alpha = bestScore;
@@ -133,24 +148,42 @@ static Score alphaBeta(ChessBoard *restrict board, Score alpha, Score beta, Dept
     return bestScore;
 }
 
-MoveObject startSearch(ChessBoard *restrict board, Depth depth, SearchThread *st) {
-    startNewSearch(st->tt);
+static void* startSearch(void *searchThread) {
+    SearchThread *st = searchThread;
     SearchHelper sh[MAX_DEPTH + 1];
     sh[0].ply = 0;
     
     char pvString[2048];
     double totalTime;
-    int score = 0;
-    clock_t start = clock();
-    for (Depth d = 1; d <= depth; d++) { // TODO: Experiment with different steps for iterative deepening
-        score = alphaBeta(board, -INFINITE, INFINITE, d, sh, true, st);
+    Score score;
+    clock_t start = clock(); // TODO: Use real time
+    for (Depth depth = 1; !atomic_load_explicit(&stop, memory_order_relaxed); depth++) {
+        score = alphaBeta(&st->board, -INFINITE, INFINITE, depth, sh, true, st); // TODO: API signature change
         totalTime = (double) (clock() - start) / CLOCKS_PER_SEC;
 
         pvToString(pvString, sh[0].pv);
-        // TODO: Should eventually include seldepth, nodes, multipv?, score mate, nps, maybe others 
-        printf("info depth %d time %.0lf score cp %d pv %s\n", d, totalTime * 1000.0, score, pvString);
+        // TODO: Should eventually include seldepth, nodes, score mate, nps, maybe others
+        if (st->print) printf("info depth %d time %.0lf score cp %d pv %s\n", depth, totalTime * 1000.0, score, pvString);
     }
-    printf("bestmove %s\n", pvString); //TODO: Should eventually include ponder
-    MoveObject best = {sh[0].pv[0], score};
-    return best;
+    if (st->print) {
+        char bestMove[6];
+        moveToString(bestMove, sh[0].pv[0]);
+        printf("bestmove %s\n", bestMove); // TODO: Ponder
+    }
+    return nullptr;
+}
+
+void startSearchThreads(UCI_Configuration *restrict config) {
+    startNewSearch(&config->tt);
+    pthread_t th;
+    SearchThread st;
+    atomic_store_explicit(&stop, false, memory_order_relaxed);
+    createSearchThread(&st, &config->board, &config->tt, true);
+    pthread_create(&th, nullptr, startSearch, &st);
+
+    time_t start = time(nullptr);
+    while (time(nullptr) - start <= 1.0);
+
+    atomic_store_explicit(&stop, true, memory_order_relaxed);
+    pthread_join(th, nullptr);
 }
