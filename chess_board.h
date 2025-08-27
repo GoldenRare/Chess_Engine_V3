@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include "utility.h"
+#include "nnue.h"
 
 // Uses a linked list to keep track of the history of the game. 
 // Maintains information that is lost when a move is made but also
@@ -19,6 +20,7 @@ typedef struct ChessBoardHistory {
 } ChessBoardHistory;
 
 typedef struct ChessBoard {
+    Accumulator accumulator;
     ChessBoardHistory *history;
     Bitboard pieces[COLOURS][PIECE_TYPES];
     PieceType pieceTypes[SQUARES];
@@ -32,11 +34,16 @@ extern Bitboard fullLine[SQUARES][SQUARES];
 // Includes the endpoints as well
 extern Bitboard inBetweenLine[SQUARES][SQUARES];
 
-extern const char *SQUARE_NAME[];
-extern const char PROMOTION_NAME[];
-
 static inline Key getPositionKey(const ChessBoard *restrict board) {
     return board->history->positionKey;
+}
+
+static inline Square getEnPassant(const ChessBoard *restrict board) {
+    return board->history->enPassant;
+}
+
+static inline Bitboard getCheckers(const ChessBoard *restrict board) {
+    return board->history->checkers;
 }
 
 static inline Bitboard getPieces(const ChessBoard *restrict board, Colour c, PieceType pt) {
@@ -47,32 +54,33 @@ static inline Bitboard getOccupiedSquares(const ChessBoard *restrict board) {
     return board->pieces[WHITE][ALL_PIECES] | board->pieces[BLACK][ALL_PIECES];
 }
 
-static inline Bitboard getCheckers(const ChessBoard *restrict board) {
-    return board->history->checkers;
-}
-
 static inline Square getKingSquare(const ChessBoard *restrict board, Colour c) {
     return bitboardToSquare(getPieces(board, c, KING));
 }
 
+static inline bool insufficientMaterial(const ChessBoard *restrict board) {
+    return populationCount(getOccupiedSquares(board)) == 2;
+}
+
 // TODO: Technically should be when half move is 100 and not checkmate
 // TODO: Threefold repetition, greater or equal to 8
-// TODO: Sufficient material
 // TODO: Stalemate
 // TODO: Null pointer checks needed if the previous positions are not there such as setting FEN to not start
+// TODO: More for search, but repetition by history vs repetition by search tree transpose
 static inline bool isDraw(const ChessBoard *restrict board) {
-    /*if (board->history->halfmoveClock >= 8) {
+    // TODO: Twofold repetition safe for now since depth is hard coded, so new search would give same result
+    if (board->history->halfmoveClock >= 4) {
         Key current = getPositionKey(board);
         ChessBoardHistory *previous = board->history->previous->previous->previous->previous;
-        int repetitions = current == previous->positionKey ? 2 : 1;
+        if (current == previous->positionKey) return true;
         int count = previous->halfmoveClock;
         while (count >= 2) {
             previous = previous->previous->previous;
-            if (current == previous->positionKey && ++repetitions == 3) return true;
+            if (current == previous->positionKey) return true;
             count -= 2;
         }
-    }*/
-    return board->history->halfmoveClock > 100;
+    }
+    return board->history->halfmoveClock > 100 || insufficientMaterial(board);
 }
 
 // Clears the board, but DOES NOT recursively clear the ChessBoardHistory, only clears the first one.
@@ -92,7 +100,7 @@ void initializeChessBoard();
 void parseFEN(ChessBoard *board, ChessBoardHistory *history, const char *restrict fen);
 void getFEN(const ChessBoard *restrict board, char *restrict destination);
 
-void makeMove(ChessBoard *board, ChessBoardHistory *history, Move move);
+void makeMove(ChessBoard *board, ChessBoardHistory *newState, Move move);
 void undoMove(ChessBoard *restrict board, Move move);
 bool isLegalMove(const ChessBoard *restrict board, Move move);
 
