@@ -23,10 +23,16 @@ static inline void updatePV(Move move, Move *restrict currentPV, const Move *res
     while((*currentPV++ = *childrenPV++));
 }
 
-static inline void pvToString(char *restrict destination, const Move *restrict pv) {
-    for (Depth depth = 0; depth < MAX_DEPTH && pv[depth]; depth++) {
-        if (depth) *destination++ = ' ';
-        destination += moveToString(destination, pv[depth]);
+// TODO: Is this the ideal implementation?
+// Always assumes there is at least one move in the principal variation
+static inline void pvToString(char *restrict pvStr, char *restrict bestMove, char *restrict ponderMove, const Move *restrict pv) {
+    moveToString(bestMove, pv[0]);
+    pvStr += moveToString(pvStr, pv[0]);
+    *ponderMove = '\0';
+    for (Depth depth = 1; depth < MAX_DEPTH && pv[depth]; depth++) {
+        if (depth == 1) moveToString(ponderMove, pv[depth]);
+        *pvStr++ = ' ';
+        pvStr += moveToString(pvStr, pv[depth]);
     }
 }
 
@@ -92,7 +98,11 @@ static Score alphaBeta(ChessBoard *restrict board, Score alpha, Score beta, Dept
     if (isDraw(board)) return DRAW;
     /*                   */
 
-    /* 3) Transposition Table */
+    /* 3) Out of Time Check */
+    if (atomic_load_explicit(&stop, memory_order_relaxed)) return DRAW; // TODO: Is this expensive?
+    /*                      */
+
+    /* 4) Transposition Table */
     Key positionKey = getPositionKey(board);
     bool hasEvaluation;
     PositionEvaluation *pe = probeTranspositionTable(st->tt, positionKey, &hasEvaluation);
@@ -128,7 +138,7 @@ static Score alphaBeta(ChessBoard *restrict board, Score alpha, Score beta, Dept
         if (score > bestScore) {
             if (score > alpha) {
                 if (score >= beta) {
-                    savePositionEvaluation(st->tt, pe, positionKey, move, depth, LOWER, adjustNodeScoreToTT(score, sh->ply));
+                    if (!atomic_load_explicit(&stop, memory_order_relaxed)) savePositionEvaluation(st->tt, pe, positionKey, move, depth, LOWER, adjustNodeScoreToTT(score, sh->ply));
                     return score;
                 }
                 updatePV(move, sh->pv, child->pv); // TODO: Only needs to be done once on the last score > alpha, but integrity is lost
@@ -144,7 +154,7 @@ static Score alphaBeta(ChessBoard *restrict board, Score alpha, Score beta, Dept
     if (bestScore == -INFINITE) bestScore = getCheckers(board) ? -CHECKMATE + sh->ply : DRAW; // TODO: Should this be considered EXACT bound?
     /*                                   */
 
-    savePositionEvaluation(st->tt, pe, positionKey, bestMove, depth, bestMove != NO_MOVE ? EXACT : UPPER, adjustNodeScoreToTT(bestScore, sh->ply));
+    if (!atomic_load_explicit(&stop, memory_order_relaxed)) savePositionEvaluation(st->tt, pe, positionKey, bestMove, depth, bestMove != NO_MOVE ? EXACT : UPPER, adjustNodeScoreToTT(bestScore, sh->ply));
     return bestScore;
 }
 
@@ -153,7 +163,7 @@ static void* startSearch(void *searchThread) {
     SearchHelper sh[MAX_DEPTH + 1];
     sh[0].ply = 0;
     
-    char pvString[2048];
+    char pvString[2048], bestMove[6], ponderMove[6];
     double totalTime;
     Score score;
     clock_t start = clock(); // TODO: Use real time
@@ -161,14 +171,15 @@ static void* startSearch(void *searchThread) {
         score = alphaBeta(&st->board, -INFINITE, INFINITE, depth, sh, true, st); // TODO: API signature change
         totalTime = (double) (clock() - start) / CLOCKS_PER_SEC;
 
-        pvToString(pvString, sh[0].pv);
-        // TODO: Should eventually include seldepth, nodes, score mate, nps, maybe others
-        if (st->print) printf("info depth %d time %.0lf score cp %d pv %s\n", depth, totalTime * 1000.0, score, pvString);
+        if (!atomic_load_explicit(&stop, memory_order_relaxed)) {
+            pvToString(pvString, bestMove, ponderMove, sh[0].pv);
+            // TODO: Should eventually include seldepth, nodes, score mate, nps, maybe others
+            if (st->print) printf("info depth %d time %.0lf score cp %d pv %s\n", depth, totalTime * 1000.0, score, pvString);
+        }
     }
     if (st->print) {
-        char bestMove[6];
-        moveToString(bestMove, sh[0].pv[0]);
-        printf("bestmove %s\n", bestMove); // TODO: Ponder
+        if (ponderMove[0]) printf("bestmove %s ponder %s\n", bestMove, ponderMove);
+        else printf("bestmove %s\n", bestMove);
     }
     return nullptr;
 }
