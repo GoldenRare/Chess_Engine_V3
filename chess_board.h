@@ -50,14 +50,17 @@ static inline Bitboard getPieces(const ChessBoard *restrict board, Colour c, Pie
     return board->pieces[c][pt];
 }
 
+// TODO: Is it worth having one lookup rather than ORing?
 static inline Bitboard getOccupiedSquares(const ChessBoard *restrict board) {
     return board->pieces[WHITE][ALL_PIECES] | board->pieces[BLACK][ALL_PIECES];
 }
 
+// TODO: Is it worth maintaining the king square in struct rather than compute?
 static inline Square getKingSquare(const ChessBoard *restrict board, Colour c) {
     return bitboardToSquare(getPieces(board, c, KING));
 }
 
+// TODO: Include more scenarios if necessary
 static inline bool insufficientMaterial(const ChessBoard *restrict board) {
     return populationCount(getOccupiedSquares(board)) == 2;
 }
@@ -68,7 +71,7 @@ static inline bool insufficientMaterial(const ChessBoard *restrict board) {
 // TODO: Null pointer checks needed if the previous positions are not there such as setting FEN to not start
 // TODO: More for search, but repetition by history vs repetition by search tree transpose
 static inline bool isDraw(const ChessBoard *restrict board) {
-    // TODO: Twofold repetition safe for now since depth is hard coded, so new search would give same result
+    // TODO: Twofold repetition now risky since we can sometimes prevent looking deeply
     if (board->history->halfmoveClock >= 4) {
         Key current = getPositionKey(board);
         ChessBoardHistory *previous = board->history->previous->previous->previous->previous;
@@ -83,15 +86,11 @@ static inline bool isDraw(const ChessBoard *restrict board) {
     return board->history->halfmoveClock > 100 || insufficientMaterial(board);
 }
 
-// Clears the board, but DOES NOT recursively clear the ChessBoardHistory, only clears the first one.
-static inline void clearBoard(ChessBoard *restrict board) {
-    *board->history = (ChessBoardHistory) {0};
-    *board          = (ChessBoard       ) {0};
-}
-
-static inline bool isPathClear(Square from, Square to, Bitboard occupied) {
-    return !(inBetweenLine[from][to] & occupied);
-}
+/*static inline bool isPseudoMove(const ChessBoard *restrict board, Move move) {
+    Square fromSquare = getFromSquare(move);
+    Bitboard stmPieces = getPieces(board, board->sideToMove, board->pieceTypes[fromSquare]);
+    return stmPieces & squareToBitboard(fromSquare) && ~stmPieces & squareToBitboard(getToSquare( ));
+}*/
 
 void initializeChessBoard();
 
