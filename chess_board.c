@@ -173,8 +173,8 @@ void parseFEN(ChessBoard *board, ChessBoardHistory *history, const char *restric
     while (*fen != ' ') {
         unsigned char ch = *fen++;
         if (ch > 'A') {
-            addPiece(board, CHAR_TO_COLOUR[ch], CHAR_TO_PIECE_TYPE[ch], sq++);
-            board->history->positionKey ^= zobristHashes.pieceOnSquare[CHAR_TO_PIECE_TYPE[ch] + COLOUR_OFFSET * CHAR_TO_COLOUR[ch]][sq];
+            addPiece(board, CHAR_TO_COLOUR[ch], CHAR_TO_PIECE_TYPE[ch], sq);
+            history->positionKey ^= zobristHashes.pieceOnSquare[CHAR_TO_PIECE_TYPE[ch] + COLOUR_OFFSET * CHAR_TO_COLOUR[ch]][sq++];
         } else if (ch > '/') {
             sq += ch - '0';
         }
@@ -182,27 +182,27 @@ void parseFEN(ChessBoard *board, ChessBoardHistory *history, const char *restric
 
     /* 2) Side to Move */
     board->sideToMove = CHAR_TO_COLOUR[(unsigned char)*++fen];
-    if (board->sideToMove) board->history->positionKey ^= zobristHashes.sideToMove;
+    if (board->sideToMove) history->positionKey ^= zobristHashes.sideToMove;
     fen++;
 
     /* 3) Castling Ability */
-    while (*++fen != ' ') board->history->castlingRights |= CHAR_TO_CASTLING_RIGHTS[(unsigned char) *fen];
-    board->history->positionKey ^= zobristHashes.castlingRights[board->history->castlingRights];
+    while (*++fen != ' ') history->castlingRights |= CHAR_TO_CASTLING_RIGHTS[(unsigned char) *fen];
+    history->positionKey ^= zobristHashes.castlingRights[history->castlingRights];
     
     /* 4) En Passant Target Square */
     if (*++fen != '-') {
             int file = *fen - 'a';
             int rank = *++fen - '8';
-            board->history->enPassant = rank * -8 + file;
-            board->history->positionKey ^= zobristHashes.enPassant[file];
+            history->enPassant = rank * -8 + file;
+            history->positionKey ^= zobristHashes.enPassant[file];
     } else {
-        board->history->enPassant = NO_SQUARE;
+        history->enPassant = NO_SQUARE;
     }
     fen++;
 
     /* 5) Halfmove Clock */
-    board->history->halfmoveClock = 0;
-    while (*++fen != ' ') board->history->halfmoveClock = board->history->halfmoveClock * 10 + *fen - '0';
+    history->halfmoveClock = 0;
+    while (*++fen != ' ') history->halfmoveClock = history->halfmoveClock * 10 + *fen - '0';
 
     /* 6) Fullmove Counter -> Ply */
     board->ply = 0;
@@ -210,8 +210,8 @@ void parseFEN(ChessBoard *board, ChessBoardHistory *history, const char *restric
     board->ply = (board->ply << 1) - (board->sideToMove ^ 1);
 
     /* 7) Miscellaneous Data */
-    board->history->checkers = attackersTo(board, getKingSquare(board, board->sideToMove), board->sideToMove, getOccupiedSquares(board));
-    board->history->pinnedPieces = getPinnedPieces(board);
+    history->checkers = attackersTo(board, getKingSquare(board, board->sideToMove), board->sideToMove, getOccupiedSquares(board));
+    history->pinnedPieces = getPinnedPieces(board);
 }
 
 void getFEN(const ChessBoard *restrict board, char *restrict destination) {
