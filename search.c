@@ -87,6 +87,7 @@ static Score quiescenceSearch(ChessBoard *restrict board, Score alpha, Score bet
     return bestScore;
 }
 
+// Does not terminate early if root node so that we can at least report one move in the pv for 'info string'
 static Score alphaBeta(ChessBoard *restrict board, Score alpha, Score beta, Depth depth, SearchHelper *restrict sh, bool isRootNode, SearchThread *st) {
     sh->pv[0] = NO_MOVE;
 
@@ -95,7 +96,7 @@ static Score alphaBeta(ChessBoard *restrict board, Score alpha, Score beta, Dept
     /*                      */
     
     /* 2) Draw Detection */
-    if (isDraw(board)) return DRAW;
+    if (!isRootNode && isDraw(board)) return DRAW;
     /*                   */
 
     /* 3) Out of Time Check */
@@ -108,8 +109,7 @@ static Score alphaBeta(ChessBoard *restrict board, Score alpha, Score beta, Dept
     PositionEvaluation *pe = probeTranspositionTable(st->tt, positionKey, &hasEvaluation);
     Move ttMove = NO_MOVE;
     if (hasEvaluation) {
-        // TODO: Do not terminate early if root node so that we can at least report one move in the pv for 'info string'
-        if (pe->depth >= depth && !isRootNode) {
+        if (!isRootNode && pe->depth >= depth) {
             Bound bound = getBound(pe); // TODO: Should you extract earlier due to race conditions?
             Score nodeScore = adjustNodeScoreFromTT(pe->nodeScore, sh->ply);
             // TODO: Consider optimizing the below
