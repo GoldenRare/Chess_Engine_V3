@@ -76,11 +76,9 @@ static inline bool isDraw(const ChessBoard *restrict board) {
         Key current = getPositionKey(board);
         ChessBoardHistory *previous = board->history->previous->previous->previous->previous;
         if (current == previous->positionKey) return true;
-        int count = previous->halfmoveClock;
-        while (count >= 2) {
+        for (int count = previous->halfmoveClock; count >= 2; count -= 2) {
             previous = previous->previous->previous;
             if (current == previous->positionKey) return true;
-            count -= 2;
         }
     }
     return board->history->halfmoveClock > 100 || insufficientMaterial(board);
