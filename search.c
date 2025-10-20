@@ -129,10 +129,13 @@ static Score alphaBeta(ChessBoard *restrict board, Score alpha, Score beta, Dept
 
     Score bestScore = -INFINITE;
     Move  bestMove  =   NO_MOVE, move;
+    bool isPvNode = beta - alpha > 1, isFirstMove = true;
     while ((move = getNextBestMove(board, &ms))) {
         if (!isLegalMove(board, move)) continue;
         makeMove(board, &history, move);
-        Score score = -alphaBeta(board, -beta, -alpha, depth - 1, child, false, st);
+        Score score;
+        if (!isPvNode || !isFirstMove) score = -alphaBeta(board, -alpha - 1, -alpha, depth - 1, child, false, st);
+        if (isPvNode && (isFirstMove || (score > alpha && score < beta))) score = -alphaBeta(board, -beta, -alpha, depth - 1, child, false, st);
         undoMove(board, move);
 
         if (score > bestScore) {
@@ -147,6 +150,7 @@ static Score alphaBeta(ChessBoard *restrict board, Score alpha, Score beta, Dept
             }
             bestScore = score;
         }
+        isFirstMove = false;
     }
     /*                 */
 
@@ -185,7 +189,8 @@ static void* startSearch(void *searchThread) {
 }
 
 void startSearchThreads(UCI_Configuration *restrict config) {
-    startNewSearch(&config->tt);
+    config->tt.age++;
+
     pthread_t th;
     SearchThread st;
     atomic_store_explicit(&stop, false, memory_order_relaxed);
