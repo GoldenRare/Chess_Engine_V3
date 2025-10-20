@@ -120,7 +120,6 @@ static Score alphaBeta(Score alpha, Score beta, Depth depth, SearchHelper *restr
     }
     /*                        */
 
-    /* Main Moves Loop */
     SearchHelper *child = sh + 1;
     child->ply = sh->ply + 1;
 
@@ -131,12 +130,18 @@ static Score alphaBeta(Score alpha, Score beta, Depth depth, SearchHelper *restr
     Score bestScore = -INFINITE, oldAlpha = alpha;
     Move  bestMove  =   NO_MOVE, move;
     bool isPvNode = beta - alpha > 1, isFirstMove = true;
+
+    /* 5) Move Ordering */
     while ((move = getNextBestMove(board, &ms))) {
         if (!isLegalMove(board, move)) continue;
         makeMove(board, &history, move);
+
+        /* 6) Principal Variation Search */
         Score score;
         if (!isPvNode || !isFirstMove) score = -alphaBeta(-alpha - 1, -alpha, depth - 1, child, false, st);
         if (isPvNode && (isFirstMove || (score > alpha && score < beta))) score = -alphaBeta(-beta, -alpha, depth - 1, child, false, st);
+        /*                               */
+        
         undoMove(board, move);
 
         if (score > bestScore) {
@@ -153,7 +158,7 @@ static Score alphaBeta(Score alpha, Score beta, Depth depth, SearchHelper *restr
         }
         isFirstMove = false;
     }
-    /*                 */
+    /*                  */
 
     /* Checkmate and Stalemate Detection */
     if (bestScore == -INFINITE) bestScore = getCheckers(board) ? -CHECKMATE + sh->ply : DRAW; // TODO: Should this be considered EXACT bound?
