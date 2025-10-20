@@ -88,7 +88,8 @@ static Score quiescenceSearch(ChessBoard *restrict board, Score alpha, Score bet
 }
 
 // Does not terminate early if root node so that we can at least report one move in the pv for 'info string'
-static Score alphaBeta(ChessBoard *restrict board, Score alpha, Score beta, Depth depth, SearchHelper *restrict sh, bool isRootNode, SearchThread *st) {
+static Score alphaBeta(Score alpha, Score beta, Depth depth, SearchHelper *restrict sh, bool isRootNode, SearchThread *st) {
+    ChessBoard *board = &st->board;
     sh->pv[0] = NO_MOVE;
 
     /* 1) Quiescence Search */
@@ -127,15 +128,15 @@ static Score alphaBeta(ChessBoard *restrict board, Score alpha, Score beta, Dept
     MoveSelector ms;
     createMoveSelector(&ms, board, TT_MOVE, ttMove);
 
-    Score bestScore = -INFINITE;
+    Score bestScore = -INFINITE, oldAlpha = alpha;
     Move  bestMove  =   NO_MOVE, move;
     bool isPvNode = beta - alpha > 1, isFirstMove = true;
     while ((move = getNextBestMove(board, &ms))) {
         if (!isLegalMove(board, move)) continue;
         makeMove(board, &history, move);
         Score score;
-        if (!isPvNode || !isFirstMove) score = -alphaBeta(board, -alpha - 1, -alpha, depth - 1, child, false, st);
-        if (isPvNode && (isFirstMove || (score > alpha && score < beta))) score = -alphaBeta(board, -beta, -alpha, depth - 1, child, false, st);
+        if (!isPvNode || !isFirstMove) score = -alphaBeta(-alpha - 1, -alpha, depth - 1, child, false, st);
+        if (isPvNode && (isFirstMove || (score > alpha && score < beta))) score = -alphaBeta(-beta, -alpha, depth - 1, child, false, st);
         undoMove(board, move);
 
         if (score > bestScore) {
@@ -145,10 +146,10 @@ static Score alphaBeta(ChessBoard *restrict board, Score alpha, Score beta, Dept
                     return score;
                 }
                 updatePV(move, sh->pv, child->pv); // TODO: Only needs to be done once on the last score > alpha, but integrity is lost
-                bestMove = move; // TODO: Consider doing it when score > bestScore, also would need to change savePosEval() below
                 alpha = score; 
             }
             bestScore = score;
+            bestMove = move;
         }
         isFirstMove = false;
     }
@@ -158,7 +159,7 @@ static Score alphaBeta(ChessBoard *restrict board, Score alpha, Score beta, Dept
     if (bestScore == -INFINITE) bestScore = getCheckers(board) ? -CHECKMATE + sh->ply : DRAW; // TODO: Should this be considered EXACT bound?
     /*                                   */
 
-    if (!atomic_load_explicit(&stop, memory_order_relaxed)) savePositionEvaluation(st->tt, pe, positionKey, bestMove, depth, bestMove != NO_MOVE ? EXACT : UPPER, adjustNodeScoreToTT(bestScore, sh->ply));
+    if (!atomic_load_explicit(&stop, memory_order_relaxed)) savePositionEvaluation(st->tt, pe, positionKey, bestMove, depth, bestScore > oldAlpha ? EXACT : UPPER, adjustNodeScoreToTT(bestScore, sh->ply));
     return bestScore;
 }
 
@@ -172,7 +173,7 @@ static void* startSearch(void *searchThread) {
     Score score;
     clock_t start = clock(); // TODO: Use real time
     for (Depth depth = 1; !atomic_load_explicit(&stop, memory_order_relaxed); depth++) {
-        score = alphaBeta(&st->board, -INFINITE, INFINITE, depth, sh, true, st); // TODO: API signature change
+        score = alphaBeta(-INFINITE, INFINITE, depth, sh, true, st);
         totalTime = (double) (clock() - start) / CLOCKS_PER_SEC;
 
         if (!atomic_load_explicit(&stop, memory_order_relaxed)) {
