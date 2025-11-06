@@ -39,6 +39,14 @@ static inline Bitboard getSliderAttacks(Slider slider, Bitboard occupied, Square
     return sa->attacks[pext(occupied, sa->mask)];
 }
 
+static inline Bitboard getAttacks(PieceType pt, Bitboard occupied, Square sq) {
+    return pt == KNIGHT ? getNonSliderAttacks(KNIGHT_NON_SLIDER, sq) 
+         : pt == BISHOP ? getSliderAttacks(BISHOP_SLIDER, occupied, sq)
+         : pt == ROOK   ? getSliderAttacks(ROOK_SLIDER, occupied, sq)
+         : pt == QUEEN  ? getSliderAttacks(BISHOP_SLIDER, occupied, sq) | getSliderAttacks(ROOK_SLIDER, occupied, sq)
+         :                getNonSliderAttacks(KING_NON_SLIDER, sq);
+}
+
 void initializeAttacks();
 
 #endif
