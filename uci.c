@@ -25,12 +25,15 @@ constexpr char BENCHMARK[] = "benchmark";
 constexpr char FEN      [] = "fen"      ;
 constexpr char TRAIN    [] = "train"    ;
 
-// Default configuration
-static UCI_Configuration config = {.hashSize = 256, .threads = 1};
-
 static ChessBoardHistory temp[256]; // TODO
 
-static void go(ChessBoard *restrict board, SearchThread *restrict st) {
+// Clears the board, but DOES NOT recursively clear the ChessBoardHistory, only clears the first one.
+static inline void clearBoard(ChessBoard *restrict board) {
+    *board->history = (ChessBoardHistory) {0};
+    *board          = (ChessBoard       ) {0};
+}
+
+static void go(UCI_Configuration *restrict config) {
     constexpr char depth[] = "depth";
     // TODO: Options to potentially implement. All times are in msec
     constexpr char wtime   [] = "wtime"   ;
@@ -41,10 +44,9 @@ static void go(ChessBoard *restrict board, SearchThread *restrict st) {
     constexpr char movetime[] = "movetime";
     constexpr char infinite[] = "infinite";
 
-    Depth searchDepth = MAX_DEPTH;
     char *token;
     while ((token = strtok(nullptr, " ")))
-        if      (strcmp(token, depth   ) == 0) searchDepth = strtoul(strtok(nullptr, " "), nullptr, 10);
+        if      (strcmp(token, depth   ) == 0) strtok(nullptr, " ");
         else if (strcmp(token, wtime   ) == 0) strtok(nullptr, " ");
         else if (strcmp(token, btime   ) == 0) strtok(nullptr, " ");
         else if (strcmp(token, winc    ) == 0) strtok(nullptr, " ");
@@ -53,7 +55,8 @@ static void go(ChessBoard *restrict board, SearchThread *restrict st) {
         else if (strcmp(token, movetime) == 0);
         else if (strcmp(token, infinite) == 0)
         ;
-    startSearch(board, searchDepth, st);
+
+    startSearchThreads(config);
 }
 
 static void isReady() {
@@ -103,7 +106,7 @@ static void position(ChessBoard *restrict board) {
     }
 }
 
-static void setOption() {
+static void setOption(UCI_Configuration *restrict config) {
     constexpr char Hash   [] = "Hash"   ;
     constexpr char Threads[] = "Threads";
 
@@ -112,8 +115,8 @@ static void setOption() {
     char *token = strtok(nullptr, " ");
     strtok(nullptr, " "); // Discard value string
 
-    if      (strcmp(token, Hash   ) == 0) config.hashSize = strtoull(strtok(nullptr, " "), nullptr, 10);
-    else if (strcmp(token, Threads) == 0) config.threads = strtoul(strtok(nullptr, " "), nullptr, 10) - 1;
+    if      (strcmp(token, Hash   ) == 0) config->hashSize = strtoull(strtok(nullptr, " "), nullptr, 10);
+    else if (strcmp(token, Threads) == 0) config->threads = strtoul(strtok(nullptr, " "), nullptr, 10) - 1;
 }
 
 static void uci() {
@@ -124,8 +127,8 @@ static void uci() {
     puts("uciok");
 }
 
-static void uciNewGame(SearchThread *restrict st) {
-    clearTranspositionTable(&st->tt);
+static void uciNewGame(TT *restrict tt) {
+    clearTranspositionTable(tt);
 }
 
 static uint64_t perft(ChessBoard *restrict board, Depth depth) {
@@ -180,21 +183,20 @@ static void fen(const ChessBoard *restrict board) {
     puts(fen);
 }
 
-static void train() {
-    startTrainingThreads(&config);
+static void train(const UCI_Configuration *restrict config) {
+    startTrainingThreads(config);
 }
 
 void uciLoop() {
-    /* Stack Initialization */
-    ChessBoard board = {0};
+    // Default configuration
+    UCI_Configuration config = {.hashSize = 256, .threads = 1};
     ChessBoardHistory history = {0};
-    SearchThread st;
-    createSearchThread(&st, 256, true);
-    parseFEN(&board, &history, START_POS);
-    /*                      */
+    parseFEN(&config.board, &history, START_POS);
+    createTranspositionTable(&config.tt, config.hashSize);
 
     char input[2048]; // Assumes input is large enough to hold '\n' from stdin
     char *token = nullptr;
+    setvbuf(stdout, nullptr, _IONBF, 0);
     while (!token || strcmp(token, QUIT) != 0) {
         fgets(input, sizeof(input), stdin);
         input[strlen(input) - 1] = '\0';
@@ -202,17 +204,17 @@ void uciLoop() {
         if (!token) continue;
 
         // Official UCI Commands
-        if      (strcmp(token, GO          ) == 0) go(&board, &st);
+        if      (strcmp(token, GO          ) == 0) go(&config);
         else if (strcmp(token, IS_READY    ) == 0) isReady();
-        else if (strcmp(token, POSITION    ) == 0) position(&board);
-        else if (strcmp(token, SET_OPTION  ) == 0) setOption();
+        else if (strcmp(token, POSITION    ) == 0) position(&config.board);
+        else if (strcmp(token, SET_OPTION  ) == 0) setOption(&config);
         else if (strcmp(token, UCI         ) == 0) uci();
-        else if (strcmp(token, UCI_NEW_GAME) == 0) uciNewGame(&st);
+        else if (strcmp(token, UCI_NEW_GAME) == 0) uciNewGame(&config.tt);
 
         // Unofficial UCI Commands
         else if (strcmp(token, BENCHMARK) == 0) benchmark();
-        else if (strcmp(token, FEN      ) == 0) fen(&board);
-        else if (strcmp(token, TRAIN    ) == 0) train();
+        else if (strcmp(token, FEN      ) == 0) fen(&config.board);
+        else if (strcmp(token, TRAIN    ) == 0) train(&config);
     }
     stopTrainingThreads();
 }
