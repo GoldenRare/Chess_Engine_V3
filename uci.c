@@ -34,29 +34,33 @@ static inline void clearBoard(ChessBoard *restrict board) {
 }
 
 static void go(UCI_Configuration *restrict config) {
+    constexpr char binc [] = "binc" ;
+    constexpr char btime[] = "btime";
     constexpr char depth[] = "depth";
+    constexpr char winc [] = "winc" ;
+    constexpr char wtime[] = "wtime";
     // TODO: Options to potentially implement. All times are in msec
-    constexpr char wtime   [] = "wtime"   ;
-    constexpr char btime   [] = "btime"   ;
-    constexpr char winc    [] = "winc"    ;
-    constexpr char binc    [] = "binc"    ;
     constexpr char nodes   [] = "nodes"   ;
     constexpr char movetime[] = "movetime";
     constexpr char infinite[] = "infinite";
 
+    uint64_t bIncNs, bTimeNs, wIncNs, wTimeNs, stmSearchTimeNs, searchTimeNs;
+    bIncNs = bTimeNs = wIncNs = wTimeNs = stmSearchTimeNs = searchTimeNs = 0;
     char *token;
     while ((token = strtok(nullptr, " ")))
-        if      (strcmp(token, depth   ) == 0) strtok(nullptr, " ");
-        else if (strcmp(token, wtime   ) == 0) strtok(nullptr, " ");
-        else if (strcmp(token, btime   ) == 0) strtok(nullptr, " ");
-        else if (strcmp(token, winc    ) == 0) strtok(nullptr, " ");
-        else if (strcmp(token, binc    ) == 0) strtok(nullptr, " ");
+        if      (strcmp(token, binc    ) == 0) bIncNs = strtoull(strtok(nullptr, " "), nullptr, 10) * 1000000;
+        else if (strcmp(token, btime   ) == 0) bTimeNs = strtoull(strtok(nullptr, " "), nullptr, 10) * 1000000;
+        else if (strcmp(token, depth   ) == 0) strtok(nullptr, " ");
+        else if (strcmp(token, winc    ) == 0) wIncNs = strtoull(strtok(nullptr, " "), nullptr, 10) * 1000000;
+        else if (strcmp(token, wtime   ) == 0) wTimeNs = strtoull(strtok(nullptr, " "), nullptr, 10) * 1000000;
         else if (strcmp(token, nodes   ) == 0);
         else if (strcmp(token, movetime) == 0);
         else if (strcmp(token, infinite) == 0)
         ;
 
-    startSearchThreads(config);
+    stmSearchTimeNs = config->board.sideToMove ? bTimeNs / 20 + bIncNs / 2 : wTimeNs / 20 + wIncNs / 2;
+    searchTimeNs = stmSearchTimeNs ? stmSearchTimeNs : 1000000000;
+    startSearchThreads(config, searchTimeNs);
 }
 
 static void isReady() {

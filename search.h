@@ -17,6 +17,6 @@ static inline void createSearchThread(SearchThread *st, const ChessBoard *restri
     st->print = print;
 }
 
-void startSearchThreads(UCI_Configuration *restrict config);
+void startSearchThreads(UCI_Configuration *restrict config, uint64_t searchTimeNs);
 
 #endif

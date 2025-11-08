@@ -36,6 +36,12 @@ static inline void pvToString(char *restrict pvStr, char *restrict bestMove, cha
     }
 }
 
+static inline uint64_t getTimeNs() {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (uint64_t) ts.tv_sec * 1000000000ULL + (uint64_t) ts.tv_nsec;
+}
+
 /*static inline uint64_t timeDiffMs(const struct timespec *restrict start, const struct timespec *restrict end) {
     time_t diffsecs = end->tv_sec - start->tv_sec;
     long   diffnano = end->tv_nsec - end->tv_nsec;
@@ -177,7 +183,7 @@ static void* startSearch(void *searchThread) {
     double totalTime;
     Score score;
     clock_t start = clock(); // TODO: Use real time
-    for (Depth depth = 1; !atomic_load_explicit(&stop, memory_order_relaxed); depth++) {
+    for (Depth depth = 1; depth && !atomic_load_explicit(&stop, memory_order_relaxed); depth++) {
         score = alphaBeta(-INFINITE, INFINITE, depth, sh, true, st);
         totalTime = (double) (clock() - start) / CLOCKS_PER_SEC;
 
@@ -194,7 +200,7 @@ static void* startSearch(void *searchThread) {
     return nullptr;
 }
 
-void startSearchThreads(UCI_Configuration *restrict config) {
+void startSearchThreads(UCI_Configuration *restrict config, uint64_t searchTimeNs) {
     config->tt.age++;
 
     pthread_t th;
@@ -203,8 +209,8 @@ void startSearchThreads(UCI_Configuration *restrict config) {
     createSearchThread(&st, &config->board, &config->tt, true);
     pthread_create(&th, nullptr, startSearch, &st);
 
-    time_t start = time(nullptr);
-    while (time(nullptr) - start <= 1.0);
+    uint64_t start = getTimeNs();
+    while (getTimeNs() - start <= searchTimeNs);
 
     atomic_store_explicit(&stop, true, memory_order_relaxed);
     pthread_join(th, nullptr);
