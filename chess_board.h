@@ -84,12 +84,6 @@ static inline bool isDraw(const ChessBoard *restrict board) {
     return board->history->halfmoveClock > 100 || insufficientMaterial(board);
 }
 
-/*static inline bool isPseudoMove(const ChessBoard *restrict board, Move move) {
-    Square fromSquare = getFromSquare(move);
-    Bitboard stmPieces = getPieces(board, board->sideToMove, board->pieceTypes[fromSquare]);
-    return stmPieces & squareToBitboard(fromSquare) && ~stmPieces & squareToBitboard(getToSquare( ));
-}*/
-
 void initializeChessBoard();
 
 // Caller is responsible for ensuring the board and history struct are zeroed and
@@ -100,8 +94,6 @@ void getFEN(const ChessBoard *restrict board, char *restrict destination);
 void makeMove(ChessBoard *board, ChessBoardHistory *newState, Move move);
 void undoMove(ChessBoard *restrict board, Move move);
 bool isLegalMove(const ChessBoard *restrict board, Move move);
-
-// TODO: Need to find minimum validation to assert correctness
 bool isPseudoMove(const ChessBoard *restrict board, Move move);
 
 #endif

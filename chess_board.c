@@ -409,6 +409,7 @@ bool isLegalMove(const ChessBoard *restrict board, Move move) {
     return !(board->history->pinnedPieces & fromSquareBB) || fullLine[fromSquare][toSquare] & squareToBitboard(kingSquare);
 }
 
+// TODO: Need to find minimum validation to assert correctness
 bool isPseudoMove(const ChessBoard *restrict board, Move move) {
     MoveObject moveList[256];
     MoveObject *startList = moveList;
