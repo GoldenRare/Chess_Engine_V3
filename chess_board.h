@@ -65,25 +65,6 @@ static inline bool insufficientMaterial(const ChessBoard *restrict board) {
     return populationCount(getOccupiedSquares(board)) == 2;
 }
 
-// TODO: Technically should be when half move is 100 and not checkmate
-// TODO: Threefold repetition, greater or equal to 8
-// TODO: Stalemate
-// TODO: Null pointer checks needed if the previous positions are not there such as setting FEN to not start
-// TODO: More for search, but repetition by history vs repetition by search tree transpose
-static inline bool isDraw(const ChessBoard *restrict board) {
-    // TODO: Twofold repetition now risky since we can sometimes prevent looking deeply
-    if (board->history->halfmoveClock >= 4) {
-        Key current = getPositionKey(board);
-        ChessBoardHistory *previous = board->history->previous->previous->previous->previous;
-        if (current == previous->positionKey) return true;
-        for (int count = previous->halfmoveClock; count >= 2; count -= 2) {
-            previous = previous->previous->previous;
-            if (current == previous->positionKey) return true;
-        }
-    }
-    return board->history->halfmoveClock > 100 || insufficientMaterial(board);
-}
-
 void initializeChessBoard();
 
 // Caller is responsible for ensuring the board and history struct are zeroed and
@@ -93,6 +74,7 @@ void getFEN(const ChessBoard *restrict board, char *restrict destination);
 
 void makeMove(ChessBoard *board, ChessBoardHistory *newState, Move move);
 void undoMove(ChessBoard *restrict board, Move move);
+bool isDraw(const ChessBoard *restrict board);
 bool isLegalMove(const ChessBoard *restrict board, Move move);
 bool isPseudoMove(const ChessBoard *restrict board, Move move);
 

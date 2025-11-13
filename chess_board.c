@@ -78,6 +78,10 @@ static void removePiece(ChessBoard *restrict board, Colour c, PieceType pt, Squa
     accumulatorSub(&board->accumulator, c, pt, sq);
 }
 
+static bool fiftyMoveRule(const ChessBoard *restrict board) {
+    return board->history->halfmoveClock > 99 && (!getCheckers(board) || anyLegalMoves(board));
+}
+
 static Bitboard getPinnedPieces(const ChessBoard *restrict board) {
     Colour stm = board->sideToMove;
     Colour enemy = stm ^ 1;
@@ -373,6 +377,24 @@ void undoMove(ChessBoard *restrict board, Move move) {
         Square rookToSquare   = isKingSideCastle ? moveSquareInDirection(fromSquare, EAST) : moveSquareInDirection(fromSquare, WEST       );
         movePiece(board, stm, ROOK, rookToSquare, rookFromSquare);
     } 
+}
+
+// TODO: Threefold repetition, greater or equal to 8
+// TODO: Stalemate
+// TODO: Null pointer checks needed if the previous positions are not there such as setting FEN to not start
+// TODO: More for search, but repetition by history vs repetition by search tree transpose
+bool isDraw(const ChessBoard *restrict board) {
+    // TODO: Twofold repetition now risky since we can sometimes prevent looking deeply
+    if (board->history->halfmoveClock >= 4) {
+        Key current = getPositionKey(board);
+        ChessBoardHistory *previous = board->history->previous->previous->previous->previous;
+        if (current == previous->positionKey) return true;
+        for (int count = previous->halfmoveClock; count >= 2; count -= 2) {
+            previous = previous->previous->previous;
+            if (current == previous->positionKey) return true;
+        }
+    }
+    return fiftyMoveRule(board) || insufficientMaterial(board);
 }
 
 bool isLegalMove(const ChessBoard *restrict board, Move move) {
