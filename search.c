@@ -175,22 +175,28 @@ static Score alphaBeta(Score alpha, Score beta, Depth depth, SearchHelper *restr
 }
 
 static void* startSearch(void *searchThread) {
+    constexpr Score ASPIRATION_WINDOW = 25;
     SearchThread *st = searchThread;
     SearchHelper sh[MAX_DEPTH + 1];
     sh[0].ply = 0;
     
     char pvString[2048], bestMove[6], ponderMove[6];
-    double totalTime;
     Score score;
-    clock_t start = clock(); // TODO: Use real time
+    Score alpha = -INFINITE;
+    Score beta = INFINITE;
+    uint64_t start = getTimeNs();
     for (Depth depth = 1; depth && !atomic_load_explicit(&stop, memory_order_relaxed); depth++) {
-        score = alphaBeta(-INFINITE, INFINITE, depth, sh, true, st);
-        totalTime = (double) (clock() - start) / CLOCKS_PER_SEC;
-
-        if (!atomic_load_explicit(&stop, memory_order_relaxed)) {
+        score = alphaBeta(alpha, beta, depth, sh, true, st);
+        if (score > alpha && score < beta && !atomic_load_explicit(&stop, memory_order_relaxed)) {
+            alpha = score - ASPIRATION_WINDOW;
+            beta = score + ASPIRATION_WINDOW;
             pvToString(pvString, bestMove, ponderMove, sh[0].pv);
             // TODO: Should eventually include seldepth, nodes, score mate, nps, maybe others
-            if (st->print) printf("info depth %d time %.0lf score cp %d pv %s\n", depth, totalTime * 1000.0, score, pvString);
+            if (st->print) printf("info depth %d time %llu score cp %d pv %s\n", depth, (getTimeNs() - start) / 1000000, score, pvString);
+        } else {
+            depth--;
+            alpha = score > alpha ? alpha : -INFINITE;
+            beta  = score < beta  ? beta  :  INFINITE;
         }
     }
     if (st->print) {
