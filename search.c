@@ -42,15 +42,15 @@ static inline uint64_t getTimeNs() {
     return (uint64_t) ts.tv_sec * 1000000000ULL + (uint64_t) ts.tv_nsec;
 }
 
-/*static inline uint64_t timeDiffMs(const struct timespec *restrict start, const struct timespec *restrict end) {
-    time_t diffsecs = end->tv_sec - start->tv_sec;
-    long   diffnano = end->tv_nsec - end->tv_nsec;
-    if (diffnano < 0) {
-        diffsecs--;
-        diffnano += 1000000000L;
-    }
-    return (long long)diffsecs * 1000LL + (long long)(diffnano / 1000000L);
-}*/
+// A move is considered interesting if it is a capture move or a Queen promotion
+static inline bool isInteresting(const ChessBoard *restrict board, Move move) {
+    return board->pieceTypes[getToSquare(move)] || getMoveType(move) == EN_PASSANT || getMoveType(move) == QUEEN_PROMOTION;
+}
+
+// TODO: Ensure our static evaluation after scaled cannot return a false checkmate
+static inline Score getReverseFutilityPruningScore(Score staticEvaluation, Depth depth) {
+    return staticEvaluation + 150 * depth;
+}
 
 static Score quiescenceSearch(ChessBoard *restrict board, Score alpha, Score beta, SearchHelper *restrict sh) {
 
@@ -133,19 +133,29 @@ static Score alphaBeta(Score alpha, Score beta, Depth depth, SearchHelper *restr
     MoveSelector ms;
     createMoveSelector(&ms, board, TT_MOVE, ttMove);
 
+    int legalMoves = 0;
+    bool checkers = getCheckers(board);
+    bool isPvNode = beta - alpha > 1;
+    Score staticEvaluation = depth < 4 && !checkers ? evaluation(&board->accumulator, board->sideToMove) : -INFINITE;
     Score bestScore = -INFINITE, oldAlpha = alpha;
     Move  bestMove  =   NO_MOVE, move;
-    bool isPvNode = beta - alpha > 1, isFirstMove = true;
 
     /* 5) Move Ordering */
     while ((move = getNextBestMove(board, &ms))) {
         if (!isLegalMove(board, move)) continue;
+        legalMoves++;
+
+        bool expectedNonPvNode = !isPvNode || legalMoves > 1;
+        /** 6) Reverse Futility Pruning **/
+        if (expectedNonPvNode && depth < 4 && !checkers && !isInteresting(board, move) && getReverseFutilityPruningScore(staticEvaluation, depth) <= alpha) continue;
+        /**                             **/
+
         makeMove(board, &history, move);
 
-        /* 6) Principal Variation Search */
+        /* 7) Principal Variation Search */
         Score score;
-        if (!isPvNode || !isFirstMove) score = -alphaBeta(-alpha - 1, -alpha, depth - 1, child, false, st);
-        if (isPvNode && (isFirstMove || (score > alpha && score < beta))) score = -alphaBeta(-beta, -alpha, depth - 1, child, false, st);
+        if (expectedNonPvNode) score = -alphaBeta(-alpha - 1, -alpha, depth - 1, child, false, st);
+        if (isPvNode && (legalMoves == 1 || (score > alpha && score < beta))) score = -alphaBeta(-beta, -alpha, depth - 1, child, false, st);
         /*                               */
         
         undoMove(board, move);
@@ -162,15 +172,14 @@ static Score alphaBeta(Score alpha, Score beta, Depth depth, SearchHelper *restr
             bestScore = score;
             bestMove = move;
         }
-        isFirstMove = false;
     }
     /*                  */
 
-    /* Checkmate and Stalemate Detection */
-    if (bestScore == -INFINITE) bestScore = getCheckers(board) ? -CHECKMATE + sh->ply : DRAW; // TODO: Should this be considered EXACT bound?
-    /*                                   */
+    /* 8) Checkmate and Stalemate Detection */
+    if (!legalMoves) bestScore = checkers ? -CHECKMATE + sh->ply : DRAW; // TODO: Should this be considered EXACT bound?
+    /*                                      */
 
-    if (!atomic_load_explicit(&stop, memory_order_relaxed)) savePositionEvaluation(st->tt, pe, positionKey, bestMove, depth, bestScore > oldAlpha ? EXACT : UPPER, adjustNodeScoreToTT(bestScore, sh->ply));
+    if (!atomic_load_explicit(&stop, memory_order_relaxed)) savePositionEvaluation(st->tt, pe, positionKey, bestMove, depth, bestScore > oldAlpha ? EXACT : UPPER, adjustNodeScoreToTT(bestScore == -INFINITE ? staticEvaluation : bestScore, sh->ply));
     return bestScore;
 }
 
