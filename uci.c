@@ -198,7 +198,7 @@ void uciLoop() {
     parseFEN(&config.board, &history, START_POS);
     createTranspositionTable(&config.tt, config.hashSize);
 
-    char input[2048]; // Assumes input is large enough to hold '\n' from stdin
+    char input[4096]; // Assumes input is large enough to hold '\n' from stdin
     char *token = nullptr;
     setvbuf(stdout, nullptr, _IONBF, 0);
     while (!token || strcmp(token, QUIT) != 0) {
