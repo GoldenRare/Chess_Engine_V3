@@ -126,33 +126,42 @@ static Score alphaBeta(Score alpha, Score beta, Depth depth, SearchHelper *restr
     }
     /*                        */
 
+    ChessBoardHistory history;
     SearchHelper *child = sh + 1;
     child->ply = sh->ply + 1;
 
-    ChessBoardHistory history;
+    bool isPvNode = beta - alpha > 1;
+    bool checkers = getCheckers(board);
+    Score staticEvaluation = checkers ? -INFINITE : evaluation(&board->accumulator, board->sideToMove);
+    /** 5) Null Move Pruning **/
+    if (!isPvNode && !checkers && depth > 3 && staticEvaluation >= beta) {
+        makeNullMove(board, &history);
+        Score score = -alphaBeta(-beta, -beta + 1, depth - 4, child, false, st);
+        undoNullMove(board);
+        if (score >= beta) return score;
+    }
+    /**                      **/
+
     MoveSelector ms;
     createMoveSelector(&ms, board, TT_MOVE, ttMove);
 
     int legalMoves = 0;
-    bool checkers = getCheckers(board);
-    bool isPvNode = beta - alpha > 1;
-    Score staticEvaluation = depth < 4 && !checkers ? evaluation(&board->accumulator, board->sideToMove) : -INFINITE;
     Score bestScore = -INFINITE, oldAlpha = alpha;
     Move  bestMove  =   NO_MOVE, move;
 
-    /* 5) Move Ordering */
+    /* 6) Move Ordering */
     while ((move = getNextBestMove(board, &ms))) {
         if (!isLegalMove(board, move)) continue;
         legalMoves++;
 
         bool expectedNonPvNode = !isPvNode || legalMoves > 1;
-        /** 6) Reverse Futility Pruning **/
+        /** 7) Reverse Futility Pruning **/
         if (expectedNonPvNode && depth < 4 && !checkers && !isInteresting(board, move) && getReverseFutilityPruningScore(staticEvaluation, depth) <= alpha) continue;
         /**                             **/
 
         makeMove(board, &history, move);
 
-        /* 7) Principal Variation Search */
+        /* 8) Principal Variation Search */
         Score score;
         if (expectedNonPvNode) score = -alphaBeta(-alpha - 1, -alpha, depth - 1, child, false, st);
         if (isPvNode && (legalMoves == 1 || (score > alpha && score < beta))) score = -alphaBeta(-beta, -alpha, depth - 1, child, false, st);
@@ -175,7 +184,7 @@ static Score alphaBeta(Score alpha, Score beta, Depth depth, SearchHelper *restr
     }
     /*                  */
 
-    /* 8) Checkmate and Stalemate Detection */
+    /* 9) Checkmate and Stalemate Detection */
     if (!legalMoves) bestScore = checkers ? -CHECKMATE + sh->ply : DRAW; // TODO: Should this be considered EXACT bound?
     /*                                      */
 

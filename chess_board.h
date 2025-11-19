@@ -65,6 +65,11 @@ static inline bool insufficientMaterial(const ChessBoard *restrict board) {
     return populationCount(getOccupiedSquares(board)) == 2;
 }
 
+static inline void undoNullMove(ChessBoard *restrict board) {
+    board->sideToMove ^= 1;
+    board->history = board->history->previous;
+}
+
 void initializeChessBoard();
 
 // Caller is responsible for ensuring the board and history struct are zeroed and
@@ -72,6 +77,7 @@ void initializeChessBoard();
 void parseFEN(ChessBoard *board, ChessBoardHistory *history, const char *restrict fen);
 void getFEN(const ChessBoard *restrict board, char *restrict destination);
 
+void makeNullMove(ChessBoard *board, ChessBoardHistory *newState);
 void makeMove(ChessBoard *board, ChessBoardHistory *newState, Move move);
 void undoMove(ChessBoard *restrict board, Move move);
 bool isDraw(const ChessBoard *restrict board);

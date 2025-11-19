@@ -292,6 +292,20 @@ void getFEN(const ChessBoard *restrict board, char *restrict destination) {
     *destination = '\0';
 }
 
+void makeNullMove(ChessBoard *board, ChessBoardHistory *newState) {
+    newState->previous       = board->history;
+    newState->positionKey    = getEnPassant(board) != NO_SQUARE ? getPositionKey(board) ^ zobristHashes.enPassant[squareToFile(getEnPassant(board))] : getPositionKey(board);
+    newState->positionKey   ^= zobristHashes.sideToMove;
+    newState->castlingRights = board->history->castlingRights;
+    newState->halfmoveClock  = 0;
+    newState->enPassant      = NO_SQUARE;
+    newState->checkers       = 0;
+
+    board->history = newState;
+    board->sideToMove ^= 1;
+    newState->pinnedPieces = getPinnedPieces(board);
+}
+
 void makeMove(ChessBoard *board, ChessBoardHistory *newState, Move move) {
     Square fromSquare = getFromSquare(move);
     Square   toSquare = getToSquare  (move);
