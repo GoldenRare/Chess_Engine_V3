@@ -134,7 +134,7 @@ static Score alphaBeta(Score alpha, Score beta, Depth depth, SearchHelper *restr
     bool checkers = getCheckers(board);
     Score staticEvaluation = checkers ? -INFINITE : evaluation(&board->accumulator, board->sideToMove);
     /** 5) Null Move Pruning **/
-    if (!isPvNode && !checkers && depth > 3 && staticEvaluation >= beta) {
+    if (!isPvNode && !checkers && depth > 3 && staticEvaluation >= beta && hasNonPawnMaterial(board, board->sideToMove)) {
         makeNullMove(board, &history);
         Score score = -alphaBeta(-beta, -beta + 1, depth - 4, child, false, st);
         undoNullMove(board);

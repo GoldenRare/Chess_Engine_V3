@@ -60,6 +60,10 @@ static inline Square getKingSquare(const ChessBoard *restrict board, Colour c) {
     return bitboardToSquare(getPieces(board, c, KING));
 }
 
+static inline bool hasNonPawnMaterial(const ChessBoard *restrict board, Colour c) {
+    return board->pieces[c][ALL_PIECES] ^ board->pieces[c][PAWN] ^ board->pieces[c][KING];
+}
+
 // TODO: Include more scenarios if necessary
 static inline bool insufficientMaterial(const ChessBoard *restrict board) {
     return populationCount(getOccupiedSquares(board)) == 2;
