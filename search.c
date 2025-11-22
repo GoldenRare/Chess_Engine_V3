@@ -159,11 +159,15 @@ static Score alphaBeta(Score alpha, Score beta, Depth depth, SearchHelper *restr
         if (expectedNonPvNode && depth < 4 && !checkers && !isInteresting(board, move) && getReverseFutilityPruningScore(staticEvaluation, depth) <= alpha) continue;
         /**                             **/
 
+        /** 8) Late Move Reductions **/
+        int reductions = legalMoves > 1 && depth > 1 ? 2 : 1;
+        /**                         **/
+
         makeMove(board, &history, move);
 
-        /* 8) Principal Variation Search */
+        /* 9) Principal Variation Search */
         Score score;
-        if (expectedNonPvNode) score = -alphaBeta(-alpha - 1, -alpha, depth - 1, child, false, st);
+        if (expectedNonPvNode) score = -alphaBeta(-alpha - 1, -alpha, depth - reductions, child, false, st);
         if (isPvNode && (legalMoves == 1 || (score > alpha && score < beta))) score = -alphaBeta(-beta, -alpha, depth - 1, child, false, st);
         /*                               */
         
@@ -184,9 +188,9 @@ static Score alphaBeta(Score alpha, Score beta, Depth depth, SearchHelper *restr
     }
     /*                  */
 
-    /* 9) Checkmate and Stalemate Detection */
+    /* 10) Checkmate and Stalemate Detection */
     if (!legalMoves) bestScore = checkers ? -CHECKMATE + sh->ply : DRAW; // TODO: Should this be considered EXACT bound?
-    /*                                      */
+    /*                                       */
 
     if (!atomic_load_explicit(&stop, memory_order_relaxed)) savePositionEvaluation(st->tt, pe, positionKey, bestMove, depth, bestScore > oldAlpha ? EXACT : UPPER, adjustNodeScoreToTT(bestScore == -INFINITE ? staticEvaluation : bestScore, sh->ply));
     return bestScore;
