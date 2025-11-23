@@ -1,8 +1,6 @@
 #include <pthread.h>
-#include <stdatomic.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <time.h>
 #include "search.h"
 #include "chess_board.h"
 #include "utility.h"
@@ -11,7 +9,6 @@
 #include "nnue.h"
 
 constexpr Depth MAX_DEPTH = 255;
-static atomic_bool stop;
 
 typedef struct SearchHelper {
     Move pv[MAX_DEPTH]; // TODO: Is it worth saving space by making triangular?
@@ -34,12 +31,6 @@ static inline void pvToString(char *restrict pvStr, char *restrict bestMove, cha
         *pvStr++ = ' ';
         pvStr += moveToString(pvStr, pv[depth]);
     }
-}
-
-static inline uint64_t getTimeNs() {
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (uint64_t) ts.tv_sec * 1000000000ULL + (uint64_t) ts.tv_nsec;
 }
 
 // A move is considered interesting if it is a capture move or a Queen promotion
@@ -107,7 +98,7 @@ static Score alphaBeta(Score alpha, Score beta, Depth depth, SearchHelper *restr
     /*                   */
 
     /* 3) Out of Time Check */
-    if (atomic_load_explicit(&stop, memory_order_relaxed)) return DRAW; // TODO: Is this expensive?
+    if (outOfTime(st)) return DRAW; // TODO: Is this expensive?
     /*                      */
 
     /* 4) Transposition Table */
@@ -176,7 +167,7 @@ static Score alphaBeta(Score alpha, Score beta, Depth depth, SearchHelper *restr
         if (score > bestScore) {
             if (score > alpha) {
                 if (score >= beta) {
-                    if (!atomic_load_explicit(&stop, memory_order_relaxed)) savePositionEvaluation(st->tt, pe, positionKey, move, depth, LOWER, adjustNodeScoreToTT(score, sh->ply));
+                    if (!outOfTime(st)) savePositionEvaluation(st->tt, pe, positionKey, move, depth, LOWER, adjustNodeScoreToTT(score, sh->ply));
                     return score;
                 }
                 updatePV(move, sh->pv, child->pv); // TODO: Only needs to be done once on the last score > alpha, but integrity is lost
@@ -192,7 +183,7 @@ static Score alphaBeta(Score alpha, Score beta, Depth depth, SearchHelper *restr
     if (!legalMoves) bestScore = checkers ? -CHECKMATE + sh->ply : DRAW; // TODO: Should this be considered EXACT bound?
     /*                                       */
 
-    if (!atomic_load_explicit(&stop, memory_order_relaxed)) savePositionEvaluation(st->tt, pe, positionKey, bestMove, depth, bestScore > oldAlpha ? EXACT : UPPER, adjustNodeScoreToTT(bestScore == -INFINITE ? staticEvaluation : bestScore, sh->ply));
+    if (!outOfTime(st)) savePositionEvaluation(st->tt, pe, positionKey, bestMove, depth, bestScore > oldAlpha ? EXACT : UPPER, adjustNodeScoreToTT(bestScore == -INFINITE ? staticEvaluation : bestScore, sh->ply));
     return bestScore;
 }
 
@@ -206,15 +197,14 @@ static void* startSearch(void *searchThread) {
     Score score;
     Score alpha = -INFINITE;
     Score beta = INFINITE;
-    uint64_t start = getTimeNs();
-    for (Depth depth = 1; depth && !atomic_load_explicit(&stop, memory_order_relaxed); depth++) {
+    for (Depth depth = 1; depth && !outOfTime(st); depth++) {
         score = alphaBeta(alpha, beta, depth, sh, true, st);
-        if (score > alpha && score < beta && !atomic_load_explicit(&stop, memory_order_relaxed)) {
+        if (score > alpha && score < beta && !outOfTime(st)) {
             alpha = score - ASPIRATION_WINDOW;
             beta = score + ASPIRATION_WINDOW;
             pvToString(pvString, bestMove, ponderMove, sh[0].pv);
             // TODO: Should eventually include seldepth, nodes, score mate, nps, maybe others
-            if (st->print) printf("info depth %d time %llu score cp %d pv %s\n", depth, (getTimeNs() - start) / 1000000, score, pvString);
+            if (st->print) printf("info depth %d time %llu score cp %d pv %s\n", depth, (getTimeNs() - st->startNs) / 1000000, score, pvString);
         } else {
             depth--;
             alpha = score > alpha ? alpha : -INFINITE;
@@ -233,13 +223,7 @@ void startSearchThreads(UCI_Configuration *restrict config, uint64_t searchTimeN
 
     pthread_t th;
     SearchThread st;
-    atomic_store_explicit(&stop, false, memory_order_relaxed);
-    createSearchThread(&st, &config->board, &config->tt, true);
+    createSearchThread(&st, &config->board, &config->tt, getTimeNs(), searchTimeNs, true);
     pthread_create(&th, nullptr, startSearch, &st);
-
-    uint64_t start = getTimeNs();
-    while (getTimeNs() - start <= searchTimeNs);
-
-    atomic_store_explicit(&stop, true, memory_order_relaxed);
     pthread_join(th, nullptr);
 }
