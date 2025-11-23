@@ -159,7 +159,7 @@ static Score alphaBeta(Score alpha, Score beta, Depth depth, SearchHelper *restr
         /* 9) Principal Variation Search */
         Score score;
         if (expectedNonPvNode) score = -alphaBeta(-alpha - 1, -alpha, depth - reductions, child, false, st);
-        if (isPvNode && (legalMoves == 1 || (score > alpha && score < beta))) score = -alphaBeta(-beta, -alpha, depth - 1, child, false, st);
+        if (isPvNode && (legalMoves == 1 || score > alpha)) score = -alphaBeta(-beta, -alpha, depth - 1, child, false, st);
         /*                               */
         
         undoMove(board, move);
