@@ -21,6 +21,7 @@ typedef struct TrainingThread {
 } TrainingThread;
 
 static TrainingThread tth[32]; // TODO
+static TT transpositionTable[32]; // TODO
 static atomic_bool stop;
 static int activeThreads;
 
@@ -64,7 +65,7 @@ static inline bool isStalemate(Score score, Move bestMove) {
 }
 
 static inline bool isEndOfGame(const ChessBoard *restrict board, const MoveObject *restrict moveObj) {
-    return isDraw(board) || isStalemate(moveObj->score, moveObj->move) || isCheckmate(moveObj->score);
+    return isCheckmate(moveObj->score) || isStalemate(moveObj->score, moveObj->move) || isDraw(board);
 }
 
 static void playRandomMoves(ChessBoard *board, ChessBoardHistory *history, TrainingThread *tt) {
@@ -88,25 +89,26 @@ static void playRandomMoves(ChessBoard *board, ChessBoardHistory *history, Train
     }
 }
 
-static void playGame(ChessBoard *restrict board, GameData *restrict previous, TrainingThread *tt) {
+static void playGame(TrainingThread *tt, GameData *restrict previous) {
+    ChessBoard *board = &tt->st.board;
     ChessBoardHistory history;
     GameData current;
-    MoveObject bestMove = startSearch(board, 5, &tt->st);
-    if (!getCheckers(board) && !isCheckmate(bestMove.score) && !insufficientMaterial(board)) { // TODO: What positions to save?
-        createGameData(&current, previous, board, bestMove.score);
+    MoveObject *bestMove = startSearch(&tt->st);
+    if (!getCheckers(board) && !isCheckmate(bestMove->score) && !insufficientMaterial(board)) { // TODO: What positions to save?
+        createGameData(&current, previous, board, bestMove->score);
         previous = &current;
     }
-    if (isEndOfGame(board, &bestMove)) {
+    if (isEndOfGame(board, bestMove)) {
         double outcome = 0.5;
-        if (isCheckmate(bestMove.score)) {
-            Colour winner = bestMove.score > 0 ? board->sideToMove : !board->sideToMove;
+        if (isCheckmate(bestMove->score)) {
+            Colour winner = bestMove->score > 0 ? board->sideToMove : !board->sideToMove;
             outcome = winner ? 0.0 : 1.0;
         }
         writeGameData(previous, tt->file, outcome);
         return;
     }
-    makeMove(board, &history, bestMove.move);
-    playGame(board, previous, tt);
+    makeMove(board, &history, bestMove->move);
+    playGame(tt, previous);
 }
 
 // Randomly plays the first 5-10 moves
@@ -116,20 +118,20 @@ static void playRandomGame(TrainingThread *tt) {
     GameData dummy = {.prev = nullptr};
     parseFEN(&board, history, START_POS);
     playRandomMoves(&board, &history[1], tt);
-    playGame(&board, &dummy, tt); // TODO: Is it safe to write data for position that randomly is draw?
+    createSearchThread(&tt->st, &board, tt->st.tt, 1000000000, false);
+    playGame(tt, &dummy); // TODO: Is it safe to write data for position that randomly is draw?
 }
 
 static void* startTraining(void *trainingThread) {
     TrainingThread *tt = trainingThread;
-    while (!atomic_load(&stop)) { // TODO: Memory order
+    while (!atomic_load_explicit(&stop, memory_order_relaxed)) {
         playRandomGame(tt);
-        clearTranspositionTable(&tt->st.tt);
+        clearTranspositionTable(tt->st.tt);
     }
     return nullptr;
 }
 
-static void startTrainingThread(TrainingThread *restrict tthr, size_t hashSizeMB, uint64_t seed, const char *restrict filename) {
-    createSearchThread(&tthr->st, hashSizeMB, false);
+static void startTrainingThread(TrainingThread *restrict tthr, uint64_t seed, const char *restrict filename) {
     tthr->seed = seed;
     tthr->file = fopen(filename, "ab+");
     pthread_create(&tthr->id, nullptr, startTraining, tthr);
@@ -137,7 +139,7 @@ static void startTrainingThread(TrainingThread *restrict tthr, size_t hashSizeMB
 
 static void stopTrainingThread(TrainingThread *tthr, FILE *restrict merge, int thIndex) {
     pthread_join(tthr->id, nullptr);
-    destroySearchThread(&tthr->st);
+    destroyTranspositionTable(tthr->st.tt);
     fflush(tthr->file);
     rewind(tthr->file);
 
@@ -156,19 +158,22 @@ void startTrainingThreads(const UCI_Configuration *restrict config) {
     activeThreads = config->threads;
     printf("info string training started with %d threads\n", activeThreads);
 
-    atomic_store(&stop, false); // TODO: Memory Order
+    atomic_store_explicit(&stop, false, memory_order_relaxed);
     uint64_t seed = time(nullptr);
     char filename[32];
     for (int i = 0; i < activeThreads; i++) {
         uint64_t random = splitMix64(&seed);
         random = random64BitNumber(&random);
         snprintf(filename, sizeof(filename), "training_data%02d.txt", i); // TODO: Make directory
-        startTrainingThread(&tth[i], config->hashSize, random, filename);
+        tth[i].st.tt = &transpositionTable[i];
+        createTranspositionTable(&transpositionTable[i], config->hashSize);
+        startTrainingThread(&tth[i], random, filename);
     }
 }
 
 void stopTrainingThreads() {
-    atomic_store(&stop, true); // TODO: Memory Order
+    if (!activeThreads) return;
+    atomic_store_explicit(&stop, true, memory_order_relaxed);
     FILE *merge = fopen("training_data.txt", "a");
     for (int i = 0; i < activeThreads; i++) {
         printf("info string stopping thread: %d\n", i);

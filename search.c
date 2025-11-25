@@ -187,21 +187,22 @@ static Score alphaBeta(Score alpha, Score beta, Depth depth, SearchHelper *restr
     return bestScore;
 }
 
-static void* startSearch(void *searchThread) {
+void* startSearch(void *searchThread) {
     constexpr Score ASPIRATION_WINDOW = 25;
     SearchThread *st = searchThread;
     SearchHelper sh[MAX_DEPTH + 1];
     sh[0].ply = 0;
     
     char pvString[2048], bestMove[6], ponderMove[6];
-    Score score;
-    Score alpha = -INFINITE;
-    Score beta = INFINITE;
+    Score score, alpha = -INFINITE, beta = INFINITE;
+    st->startNs = getTimeNs();
     for (Depth depth = 1; depth && !outOfTime(st); depth++) {
         score = alphaBeta(alpha, beta, depth, sh, true, st);
         if (score > alpha && score < beta && !outOfTime(st)) {
             alpha = score - ASPIRATION_WINDOW;
             beta = score + ASPIRATION_WINDOW;
+            st->bestMove.move  = sh[0].pv[0];
+            st->bestMove.score = score;
             pvToString(pvString, bestMove, ponderMove, sh[0].pv);
             // TODO: Should eventually include seldepth, nodes, score mate, nps, maybe others
             if (st->print) printf("info depth %d time %llu score cp %d pv %s\n", depth, (getTimeNs() - st->startNs) / 1000000, score, pvString);
@@ -215,7 +216,7 @@ static void* startSearch(void *searchThread) {
         if (ponderMove[0]) printf("bestmove %s ponder %s\n", bestMove, ponderMove);
         else printf("bestmove %s\n", bestMove);
     }
-    return nullptr;
+    return &st->bestMove;
 }
 
 void startSearchThreads(UCI_Configuration *restrict config, uint64_t searchTimeNs) {
@@ -223,7 +224,7 @@ void startSearchThreads(UCI_Configuration *restrict config, uint64_t searchTimeN
 
     pthread_t th;
     SearchThread st;
-    createSearchThread(&st, &config->board, &config->tt, getTimeNs(), searchTimeNs, true);
+    createSearchThread(&st, &config->board, &config->tt, searchTimeNs, true);
     pthread_create(&th, nullptr, startSearch, &st);
     pthread_join(th, nullptr);
 }

@@ -6,12 +6,14 @@
 #include "chess_board.h"
 #include "transposition_table.h"
 #include "uci.h"
+#include "utility.h"
 
 typedef struct SearchThread {
     ChessBoard board;
     TT *tt;
     uint64_t startNs; // TODO: Could change implementation
     uint64_t maxSearchTimeNs;
+    MoveObject bestMove;
     bool print;
 } SearchThread;
 
@@ -21,10 +23,9 @@ static inline uint64_t getTimeNs() {
     return (uint64_t) ts.tv_sec * 1000000000ULL + (uint64_t) ts.tv_nsec;
 }
 
-static inline void createSearchThread(SearchThread *st, const ChessBoard *restrict board, TT *tt, uint64_t startNs, uint64_t maxSearchTimeNs, bool print) {
+static inline void createSearchThread(SearchThread *st, const ChessBoard *restrict board, TT *tt, uint64_t maxSearchTimeNs, bool print) {
     st->board = *board; // TODO: The history pointer is a shallow copy, consider using a deep copy
     st->tt = tt;
-    st->startNs = startNs;
     st->maxSearchTimeNs = maxSearchTimeNs;
     st->print = print;
 }
@@ -33,6 +34,7 @@ static inline bool outOfTime(const SearchThread *st) {
     return getTimeNs() - st->startNs >= st->maxSearchTimeNs;
 }
 
+void* startSearch(void *searchThread);
 void startSearchThreads(UCI_Configuration *restrict config, uint64_t searchTimeNs);
 
 #endif
