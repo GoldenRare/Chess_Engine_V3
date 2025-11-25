@@ -85,7 +85,8 @@ static Score quiescenceSearch(ChessBoard *restrict board, Score alpha, Score bet
 }
 
 // Does not terminate early if root node so that we can at least report one move in the pv for 'info string'
-static Score alphaBeta(Score alpha, Score beta, Depth depth, SearchHelper *restrict sh, bool isRootNode, SearchThread *st) {
+static Score alphaBeta(Score alpha, Score beta, Depth depth, SearchHelper *restrict sh, SearchThread *st) {
+    const bool isRootNode = !sh->ply;
     ChessBoard *board = &st->board;
     sh->pv[0] = NO_MOVE;
 
@@ -127,7 +128,7 @@ static Score alphaBeta(Score alpha, Score beta, Depth depth, SearchHelper *restr
     /** 5) Null Move Pruning **/
     if (!isPvNode && !checkers && depth > 3 && staticEvaluation >= beta && hasNonPawnMaterial(board, board->sideToMove)) {
         makeNullMove(board, &history);
-        Score score = -alphaBeta(-beta, -beta + 1, depth - 4, child, false, st);
+        Score score = -alphaBeta(-beta, -beta + 1, depth - 4, child, st);
         undoNullMove(board);
         if (score >= beta) return score;
     }
@@ -158,8 +159,8 @@ static Score alphaBeta(Score alpha, Score beta, Depth depth, SearchHelper *restr
 
         /* 9) Principal Variation Search */
         Score score;
-        if (expectedNonPvNode) score = -alphaBeta(-alpha - 1, -alpha, depth - reductions, child, false, st);
-        if (isPvNode && (legalMoves == 1 || score > alpha)) score = -alphaBeta(-beta, -alpha, depth - 1, child, false, st);
+        if (expectedNonPvNode) score = -alphaBeta(-alpha - 1, -alpha, depth - reductions, child, st);
+        if (isPvNode && (legalMoves == 1 || score > alpha)) score = -alphaBeta(-beta, -alpha, depth - 1, child, st);
         /*                               */
         
         undoMove(board, move);
@@ -197,7 +198,7 @@ void* startSearch(void *searchThread) {
     Score score, alpha = -INFINITE, beta = INFINITE;
     st->startNs = getTimeNs();
     for (Depth depth = 1; depth && !outOfTime(st); depth++) {
-        score = alphaBeta(alpha, beta, depth, sh, true, st);
+        score = alphaBeta(alpha, beta, depth, sh, st);
         if (score > alpha && score < beta && !outOfTime(st)) {
             alpha = score - ASPIRATION_WINDOW;
             beta = score + ASPIRATION_WINDOW;
