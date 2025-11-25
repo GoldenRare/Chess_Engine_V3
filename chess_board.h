@@ -69,6 +69,21 @@ static inline bool insufficientMaterial(const ChessBoard *restrict board) {
     return populationCount(getOccupiedSquares(board)) == 2;
 }
 
+// TODO: For search, but repetition by history vs repetition by search tree transpose
+// Checks for twofold repetition
+static inline bool isRepetition(const ChessBoard *restrict board) {
+    if (board->history->halfmoveClock >= 4) {
+        Key current = getPositionKey(board);
+        ChessBoardHistory *previous = board->history->previous->previous->previous->previous;
+        if (current == previous->positionKey) return true;
+        for (int count = previous->halfmoveClock; count >= 2; count -= 2) {
+            previous = previous->previous->previous;
+            if (current == previous->positionKey) return true;
+        }
+    }
+    return false;
+}
+
 static inline void undoNullMove(ChessBoard *restrict board) {
     board->sideToMove ^= 1;
     board->history = board->history->previous;

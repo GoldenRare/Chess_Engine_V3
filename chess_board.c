@@ -396,19 +396,8 @@ void undoMove(ChessBoard *restrict board, Move move) {
 // TODO: Threefold repetition, greater or equal to 8
 // TODO: Stalemate
 // TODO: Null pointer checks needed if the previous positions are not there such as setting FEN to not start
-// TODO: More for search, but repetition by history vs repetition by search tree transpose
 bool isDraw(const ChessBoard *restrict board) {
-    // TODO: Twofold repetition now risky since we can sometimes prevent looking deeply
-    if (board->history->halfmoveClock >= 4) {
-        Key current = getPositionKey(board);
-        ChessBoardHistory *previous = board->history->previous->previous->previous->previous;
-        if (current == previous->positionKey) return true;
-        for (int count = previous->halfmoveClock; count >= 2; count -= 2) {
-            previous = previous->previous->previous;
-            if (current == previous->positionKey) return true;
-        }
-    }
-    return fiftyMoveRule(board) || insufficientMaterial(board);
+    return fiftyMoveRule(board) || insufficientMaterial(board) || isRepetition(board);
 }
 
 bool isLegalMove(const ChessBoard *restrict board, Move move) {
