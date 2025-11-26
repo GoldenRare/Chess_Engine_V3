@@ -50,6 +50,10 @@ static inline Bitboard getPieces(const ChessBoard *restrict board, Colour c, Pie
     return board->pieces[c][pt];
 }
 
+static inline Bitboard getBothPieces(const ChessBoard *restrict board, PieceType pt) {
+    return board->pieces[WHITE][pt] | board->pieces[BLACK][pt];
+}
+
 // TODO: Is it worth having one lookup rather than ORing?
 static inline Bitboard getOccupiedSquares(const ChessBoard *restrict board) {
     return board->pieces[WHITE][ALL_PIECES] | board->pieces[BLACK][ALL_PIECES];
@@ -66,7 +70,7 @@ static inline bool hasNonPawnMaterial(const ChessBoard *restrict board, Colour c
 
 // TODO: Include more scenarios if necessary
 static inline bool insufficientMaterial(const ChessBoard *restrict board) {
-    return populationCount(getOccupiedSquares(board)) == 2;
+    return !(getBothPieces(board, PAWN) | getBothPieces(board, ROOK) | getBothPieces(board, QUEEN)) && populationCount(getOccupiedSquares(board)) < 4;
 }
 
 // TODO: For search, but repetition by history vs repetition by search tree transpose
