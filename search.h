@@ -13,6 +13,7 @@ typedef struct SearchThread {
     TT *tt;
     uint64_t startNs; // TODO: Could change implementation
     uint64_t maxSearchTimeNs;
+    uint64_t nodes;
     MoveObject bestMove;
     bool print;
 } SearchThread;

@@ -94,15 +94,12 @@ static Score alphaBeta(Score alpha, Score beta, Depth depth, SearchHelper *restr
     if (!depth) return quiescenceSearch(board, alpha, beta, sh);
     /*                      */
     
+    st->nodes++;
     /* 2) Draw Detection */
-    if (!isRootNode && isDraw(board)) return DRAW;
+    if ((!isRootNode && isDraw(board)) || outOfTime(st)) return DRAW;
     /*                   */
 
-    /* 3) Out of Time Check */
-    if (outOfTime(st)) return DRAW; // TODO: Is this expensive?
-    /*                      */
-
-    /* 4) Transposition Table */
+    /* 3) Transposition Table */
     Key positionKey = getPositionKey(board);
     bool hasEvaluation;
     PositionEvaluation *pe = probeTranspositionTable(st->tt, positionKey, &hasEvaluation);
@@ -125,7 +122,7 @@ static Score alphaBeta(Score alpha, Score beta, Depth depth, SearchHelper *restr
     bool isPvNode = beta - alpha > 1;
     bool checkers = getCheckers(board);
     Score staticEvaluation = checkers ? -INFINITE : evaluation(&board->accumulator, board->sideToMove);
-    /** 5) Null Move Pruning **/
+    /** 4) Null Move Pruning **/
     if (!isPvNode && !checkers && depth > 3 && staticEvaluation >= beta && hasNonPawnMaterial(board, board->sideToMove)) {
         makeNullMove(board, &history);
         Score score = -alphaBeta(-beta, -beta + 1, depth - 4, child, st);
@@ -141,23 +138,23 @@ static Score alphaBeta(Score alpha, Score beta, Depth depth, SearchHelper *restr
     Score bestScore = -INFINITE, oldAlpha = alpha;
     Move  bestMove  =   NO_MOVE, move;
 
-    /* 6) Move Ordering */
+    /* 5) Move Ordering */
     while ((move = getNextBestMove(board, &ms))) {
         if (!isLegalMove(board, move)) continue;
         legalMoves++;
 
         bool expectedNonPvNode = !isPvNode || legalMoves > 1;
-        /** 7) Reverse Futility Pruning **/
+        /** 6) Reverse Futility Pruning **/
         if (expectedNonPvNode && depth < 4 && !checkers && !isInteresting(board, move) && getReverseFutilityPruningScore(staticEvaluation, depth) <= alpha) continue;
         /**                             **/
 
-        /** 8) Late Move Reductions **/
+        /** 7) Late Move Reductions **/
         int reductions = legalMoves > 1 && depth > 1 ? 2 : 1;
         /**                         **/
 
         makeMove(board, &history, move);
 
-        /* 9) Principal Variation Search */
+        /* 8) Principal Variation Search */
         Score score;
         if (expectedNonPvNode) score = -alphaBeta(-alpha - 1, -alpha, depth - reductions, child, st);
         if (isPvNode && (legalMoves == 1 || score > alpha)) score = -alphaBeta(-beta, -alpha, depth - 1, child, st);
@@ -180,9 +177,9 @@ static Score alphaBeta(Score alpha, Score beta, Depth depth, SearchHelper *restr
     }
     /*                  */
 
-    /* 10) Checkmate and Stalemate Detection */
+    /* 9) Checkmate and Stalemate Detection */
     if (!legalMoves) bestScore = checkers ? -CHECKMATE + sh->ply : DRAW; // TODO: Should this be considered EXACT bound?
-    /*                                       */
+    /*                                      */
 
     if (!outOfTime(st)) savePositionEvaluation(st->tt, pe, positionKey, bestMove, depth, bestScore > oldAlpha ? EXACT : UPPER, adjustNodeScoreToTT(bestScore == -INFINITE ? staticEvaluation : bestScore, sh->ply));
     return bestScore;
@@ -196,6 +193,7 @@ void* startSearch(void *searchThread) {
     
     char pvString[2048], bestMove[6], ponderMove[6];
     Score score, alpha = -INFINITE, beta = INFINITE;
+    st->nodes = 0;
     st->startNs = getTimeNs();
     for (Depth depth = 1; depth && !outOfTime(st); depth++) {
         score = alphaBeta(alpha, beta, depth, sh, st);
@@ -205,8 +203,8 @@ void* startSearch(void *searchThread) {
             st->bestMove.move  = sh[0].pv[0];
             st->bestMove.score = score;
             pvToString(pvString, bestMove, ponderMove, sh[0].pv);
-            // TODO: Should eventually include seldepth, nodes, score mate, nps, maybe others
-            if (st->print) printf("info depth %d time %llu score cp %d pv %s\n", depth, (getTimeNs() - st->startNs) / 1000000, score, pvString);
+            // TODO: Should eventually include seldepth, score mate, nps, maybe others
+            if (st->print) printf("info depth %d time %llu nodes %llu score cp %d pv %s\n", depth, (getTimeNs() - st->startNs) / 1000000, st->nodes, score, pvString);
         } else {
             depth--;
             alpha = score > alpha ? alpha : -INFINITE;
