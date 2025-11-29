@@ -16,6 +16,7 @@ typedef struct SearchThread {
     uint64_t nodes;
     MoveObject bestMove;
     bool print;
+    bool stop;
 } SearchThread;
 
 static inline uint64_t getTimeNs() {
@@ -29,10 +30,11 @@ static inline void createSearchThread(SearchThread *st, const ChessBoard *restri
     st->tt = tt;
     st->maxSearchTimeNs = maxSearchTimeNs;
     st->print = print;
+    st->stop = false;
 }
 
-static inline bool outOfTime(const SearchThread *st) {
-    return getTimeNs() - st->startNs >= st->maxSearchTimeNs;
+static inline bool outOfTime(SearchThread *st) {
+    return st->stop = getTimeNs() - st->startNs >= st->maxSearchTimeNs;
 }
 
 void* startSearch(void *searchThread);

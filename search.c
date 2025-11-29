@@ -165,7 +165,7 @@ static Score alphaBeta(Score alpha, Score beta, Depth depth, SearchHelper *restr
         if (score > bestScore) {
             if (score > alpha) {
                 if (score >= beta) {
-                    if (!outOfTime(st)) savePositionEvaluation(st->tt, pe, positionKey, move, depth, LOWER, adjustNodeScoreToTT(score, sh->ply));
+                    if (!st->stop) savePositionEvaluation(st->tt, pe, positionKey, move, depth, LOWER, adjustNodeScoreToTT(score, sh->ply));
                     return score;
                 }
                 updatePV(move, sh->pv, child->pv); // TODO: Only needs to be done once on the last score > alpha, but integrity is lost
@@ -181,7 +181,7 @@ static Score alphaBeta(Score alpha, Score beta, Depth depth, SearchHelper *restr
     if (!legalMoves) bestScore = checkers ? -CHECKMATE + sh->ply : DRAW; // TODO: Should this be considered EXACT bound?
     /*                                      */
 
-    if (!outOfTime(st)) savePositionEvaluation(st->tt, pe, positionKey, bestMove, depth, bestScore > oldAlpha ? EXACT : UPPER, adjustNodeScoreToTT(bestScore == -INFINITE ? staticEvaluation : bestScore, sh->ply));
+    if (!st->stop) savePositionEvaluation(st->tt, pe, positionKey, bestMove, depth, bestScore > oldAlpha ? EXACT : UPPER, adjustNodeScoreToTT(bestScore == -INFINITE ? staticEvaluation : bestScore, sh->ply));
     return bestScore;
 }
 
@@ -197,7 +197,7 @@ void* startSearch(void *searchThread) {
     st->startNs = getTimeNs();
     for (Depth depth = 1; depth && !outOfTime(st); depth++) {
         score = alphaBeta(alpha, beta, depth, sh, st);
-        if (score > alpha && score < beta && !outOfTime(st)) {
+        if (score > alpha && score < beta && !st->stop) {
             alpha = score - ASPIRATION_WINDOW;
             beta = score + ASPIRATION_WINDOW;
             st->bestMove.move  = sh[0].pv[0];
