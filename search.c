@@ -10,6 +10,10 @@
 
 constexpr Depth MAX_DEPTH = 255;
 
+typedef enum Node {
+    ROOT, PV, NON_PV
+} Node;
+
 typedef struct SearchHelper {
     Move pv[MAX_DEPTH]; // TODO: Is it worth saving space by making triangular?
     uint8_t ply;
@@ -84,9 +88,7 @@ static Score quiescenceSearch(ChessBoard *restrict board, Score alpha, Score bet
     return bestScore;
 }
 
-// Does not terminate early if root node so that we can at least report one move in the pv for 'info string'
-static Score alphaBeta(Score alpha, Score beta, Depth depth, SearchHelper *restrict sh, SearchThread *st) {
-    const bool isRootNode = !sh->ply;
+static Score alphaBeta(Score alpha, Score beta, Depth depth, Node node, SearchHelper *restrict sh, SearchThread *st) {
     ChessBoard *board = &st->board;
     sh->pv[0] = NO_MOVE;
 
@@ -96,16 +98,17 @@ static Score alphaBeta(Score alpha, Score beta, Depth depth, SearchHelper *restr
     
     st->nodes++;
     /* 2) Draw Detection */
-    if ((!isRootNode && isDraw(board)) || outOfTime(st)) return DRAW;
+    if ((node != ROOT && isDraw(board)) || outOfTime(st)) return DRAW;
     /*                   */
 
     /* 3) Transposition Table */
+    const bool isPvNode = node != NON_PV;
     Key positionKey = getPositionKey(board);
     bool hasEvaluation;
     PositionEvaluation *pe = probeTranspositionTable(st->tt, positionKey, &hasEvaluation);
     Move ttMove = NO_MOVE;
     if (hasEvaluation) {
-        if (!isRootNode && pe->depth >= depth) {
+        if (!isPvNode && pe->depth >= depth) {
             Bound bound = getBound(pe); // TODO: Should you extract earlier due to race conditions?
             Score nodeScore = adjustNodeScoreFromTT(pe->nodeScore, sh->ply);
             // TODO: Consider optimizing the below
@@ -119,13 +122,14 @@ static Score alphaBeta(Score alpha, Score beta, Depth depth, SearchHelper *restr
     SearchHelper *child = sh + 1;
     child->ply = sh->ply + 1;
 
-    bool isPvNode = beta - alpha > 1;
     bool checkers = getCheckers(board);
-    Score staticEvaluation = checkers ? -INFINITE : evaluation(&board->accumulator, board->sideToMove);
+    Score staticEvaluation = checkers ? -INFINITE 
+                           : hasEvaluation ? pe->staticEvaluation
+                           : evaluation(&board->accumulator, board->sideToMove);
     /** 4) Null Move Pruning **/
     if (!isPvNode && !checkers && depth > 3 && staticEvaluation >= beta && hasNonPawnMaterial(board, board->sideToMove)) {
         makeNullMove(board, &history);
-        Score score = -alphaBeta(-beta, -beta + 1, depth - 4, child, st);
+        Score score = -alphaBeta(-beta, -beta + 1, depth - 4, NON_PV, child, st);
         undoNullMove(board);
         if (score >= beta) return score;
     }
@@ -156,8 +160,8 @@ static Score alphaBeta(Score alpha, Score beta, Depth depth, SearchHelper *restr
 
         /* 8) Principal Variation Search */
         Score score;
-        if (expectedNonPvNode) score = -alphaBeta(-alpha - 1, -alpha, depth - reductions, child, st);
-        if (isPvNode && (legalMoves == 1 || score > alpha)) score = -alphaBeta(-beta, -alpha, depth - 1, child, st);
+        if (expectedNonPvNode) score = -alphaBeta(-alpha - 1, -alpha, depth - reductions, NON_PV, child, st);
+        if (isPvNode && (legalMoves == 1 || score > alpha)) score = -alphaBeta(-beta, -alpha, depth - 1, PV, child, st);
         /*                               */
         
         undoMove(board, move);
@@ -165,7 +169,7 @@ static Score alphaBeta(Score alpha, Score beta, Depth depth, SearchHelper *restr
         if (score > bestScore) {
             if (score > alpha) {
                 if (score >= beta) {
-                    if (!st->stop) savePositionEvaluation(st->tt, pe, positionKey, move, depth, LOWER, adjustNodeScoreToTT(score, sh->ply));
+                    if (!st->stop) savePositionEvaluation(st->tt, pe, positionKey, move, depth, LOWER, adjustNodeScoreToTT(score, sh->ply), staticEvaluation);
                     return score;
                 }
                 updatePV(move, sh->pv, child->pv); // TODO: Only needs to be done once on the last score > alpha, but integrity is lost
@@ -181,7 +185,7 @@ static Score alphaBeta(Score alpha, Score beta, Depth depth, SearchHelper *restr
     if (!legalMoves) bestScore = checkers ? -CHECKMATE + sh->ply : DRAW; // TODO: Should this be considered EXACT bound?
     /*                                      */
 
-    if (!st->stop) savePositionEvaluation(st->tt, pe, positionKey, bestMove, depth, bestScore > oldAlpha ? EXACT : UPPER, adjustNodeScoreToTT(bestScore == -INFINITE ? staticEvaluation : bestScore, sh->ply));
+    if (!st->stop) savePositionEvaluation(st->tt, pe, positionKey, bestMove, depth, bestScore > oldAlpha ? EXACT : UPPER, adjustNodeScoreToTT(bestScore == -INFINITE ? staticEvaluation : bestScore, sh->ply), staticEvaluation);
     return bestScore;
 }
 
@@ -196,7 +200,7 @@ void* startSearch(void *searchThread) {
     st->nodes = 0;
     st->startNs = getTimeNs();
     for (Depth depth = 1; depth && !outOfTime(st); depth++) {
-        score = alphaBeta(alpha, beta, depth, sh, st);
+        score = alphaBeta(alpha, beta, depth,  ROOT, sh, st);
         if (score > alpha && score < beta && !st->stop) {
             alpha = score - ASPIRATION_WINDOW;
             beta = score + ASPIRATION_WINDOW;
