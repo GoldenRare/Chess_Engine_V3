@@ -47,9 +47,18 @@ static inline Score getReverseFutilityPruningScore(Score staticEvaluation, Depth
     return staticEvaluation + 150 * depth;
 }
 
-static Score quiescenceSearch(ChessBoard *restrict board, Score alpha, Score beta, SearchHelper *restrict sh) {
+// TODO: Should eventually include seldepth, score mate, nps, maybe others
+static inline void printSearch(Depth depth, Score score, const char *restrict pvString, const SearchThread *st) {
+    printf("info depth %d time %llu nodes %llu score cp %d pv %s\n", depth, (getTimeNs() - st->startNs) / 1000000, st->nodes, score, pvString);
+}
 
+static Score quiescenceSearch(Score alpha, Score beta, SearchHelper *restrict sh, SearchThread *st) {
+    ChessBoard *board = &st->board;
+    st->nodes++;
+
+    /* 1) Draw Detection */
     if (isDraw(board)) return DRAW;
+    /*                   */
     
     Bitboard checkers = getCheckers(board);
     /* Stand Pat */
@@ -72,7 +81,7 @@ static Score quiescenceSearch(ChessBoard *restrict board, Score alpha, Score bet
         if (!isLegalMove(board, move)) continue;
         sh->ply = ply + 1;
         makeMove(board, &history, move);
-        Score score = -quiescenceSearch(board, -beta, -alpha, sh);
+        Score score = -quiescenceSearch(-beta, -alpha, sh, st);
         undoMove(board, move);
         sh->ply = ply;
         
@@ -89,13 +98,13 @@ static Score quiescenceSearch(ChessBoard *restrict board, Score alpha, Score bet
 }
 
 static Score alphaBeta(Score alpha, Score beta, Depth depth, Node node, SearchHelper *restrict sh, SearchThread *st) {
-    ChessBoard *board = &st->board;
     sh->pv[0] = NO_MOVE;
 
     /* 1) Quiescence Search */
-    if (!depth) return quiescenceSearch(board, alpha, beta, sh);
+    if (!depth) return quiescenceSearch(alpha, beta, sh, st);
     /*                      */
     
+    ChessBoard *board = &st->board;
     st->nodes++;
     /* 2) Draw Detection */
     if ((node != ROOT && isDraw(board)) || outOfTime(st)) return DRAW;
@@ -207,8 +216,7 @@ void* startSearch(void *searchThread) {
             st->bestMove.move  = sh[0].pv[0];
             st->bestMove.score = score;
             pvToString(pvString, bestMove, ponderMove, sh[0].pv);
-            // TODO: Should eventually include seldepth, score mate, nps, maybe others
-            if (st->print) printf("info depth %d time %llu nodes %llu score cp %d pv %s\n", depth, (getTimeNs() - st->startNs) / 1000000, st->nodes, score, pvString);
+            if (st->print) printSearch(depth, score, pvString, st);
         } else {
             depth--;
             alpha = score > alpha ? alpha : -INFINITE;
