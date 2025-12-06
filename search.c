@@ -47,6 +47,11 @@ static inline Score getReverseFutilityPruningScore(Score staticEvaluation, Depth
     return staticEvaluation + 150 * depth;
 }
 
+// TODO: Ensure our static evaluation after scaled cannot return a false checkmate
+static inline Score getRFPMargin(Depth depth) {
+    return 150 * depth;
+}
+
 // TODO: Should eventually include seldepth, score mate, nps, maybe others
 static inline void printSearch(Depth depth, Score score, const char *restrict pvString, const SearchThread *st) {
     printf("info depth %d time %llu nodes %llu score cp %d pv %s\n", depth, (getTimeNs() - st->startNs) / 1000000, st->nodes, score, pvString);
@@ -144,6 +149,10 @@ static Score alphaBeta(Score alpha, Score beta, Depth depth, Node node, SearchHe
     }
     /**                      **/
 
+    /** 5) Reverse Futility Pruning **/
+    if (!isPvNode && !checkers && staticEvaluation - getRFPMargin(depth) >= beta) return staticEvaluation;
+    /**                             **/
+
     MoveSelector ms;
     createMoveSelector(&ms, board, TT_MOVE, ttMove);
 
@@ -151,23 +160,23 @@ static Score alphaBeta(Score alpha, Score beta, Depth depth, Node node, SearchHe
     Score bestScore = -INFINITE, oldAlpha = alpha;
     Move  bestMove  =   NO_MOVE, move;
 
-    /* 5) Move Ordering */
+    /* 6) Move Ordering */
     while ((move = getNextBestMove(board, &ms))) {
         if (!isLegalMove(board, move)) continue;
         legalMoves++;
 
         bool expectedNonPvNode = !isPvNode || legalMoves > 1;
-        /** 6) Reverse Futility Pruning **/
+        /** 7) Futility Pruning **/
         if (expectedNonPvNode && depth < 4 && !checkers && !isInteresting(board, move) && getReverseFutilityPruningScore(staticEvaluation, depth) <= alpha) continue;
-        /**                             **/
+        /**                     **/
 
-        /** 7) Late Move Reductions **/
+        /** 8) Late Move Reductions **/
         int reductions = legalMoves > 1 && depth > 1 ? 2 : 1;
         /**                         **/
 
         makeMove(board, &history, move);
 
-        /* 8) Principal Variation Search */
+        /* 9) Principal Variation Search */
         Score score;
         if (expectedNonPvNode) score = -alphaBeta(-alpha - 1, -alpha, depth - reductions, NON_PV, child, st);
         if (isPvNode && (legalMoves == 1 || score > alpha)) score = -alphaBeta(-beta, -alpha, depth - 1, PV, child, st);
@@ -190,9 +199,9 @@ static Score alphaBeta(Score alpha, Score beta, Depth depth, Node node, SearchHe
     }
     /*                  */
 
-    /* 9) Checkmate and Stalemate Detection */
+    /* 10) Checkmate and Stalemate Detection */
     if (!legalMoves) bestScore = checkers ? -CHECKMATE + sh->ply : DRAW; // TODO: Should this be considered EXACT bound?
-    /*                                      */
+    /*                                       */
 
     if (!st->stop) savePositionEvaluation(st->tt, pe, positionKey, bestMove, depth, bestScore > oldAlpha ? EXACT : UPPER, adjustNodeScoreToTT(bestScore == -INFINITE ? staticEvaluation : bestScore, sh->ply), staticEvaluation);
     return bestScore;
