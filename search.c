@@ -117,16 +117,15 @@ static Score alphaBeta(Score alpha, Score beta, Depth depth, Node node, SearchHe
 
     /* 3) Transposition Table */
     const bool isPvNode = node != NON_PV;
-    Key positionKey = getPositionKey(board);
     bool hasEvaluation;
+    Key positionKey = getPositionKey(board);
     PositionEvaluation *pe = probeTranspositionTable(st->tt, positionKey, &hasEvaluation);
     Move ttMove = NO_MOVE;
     if (hasEvaluation) {
         if (!isPvNode && pe->depth >= depth) {
-            Bound bound = getBound(pe); // TODO: Should you extract earlier due to race conditions?
+            Bound bound = getBound(pe);
             Score nodeScore = adjustNodeScoreFromTT(pe->nodeScore, sh->ply);
-            // TODO: Consider optimizing the below
-            if ((bound == LOWER && nodeScore >= beta) || (bound == UPPER && nodeScore <= alpha) || bound == EXACT) return nodeScore;
+            if (bound == EXACT || (bound == LOWER ? nodeScore >= beta : nodeScore <= alpha)) return nodeScore;
         }
         ttMove = pe->bestMove;
     }
