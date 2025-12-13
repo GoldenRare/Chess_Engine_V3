@@ -119,15 +119,15 @@ static void setOption(UCI_Configuration *restrict config) {
     char *token = strtok(nullptr, " ");
     strtok(nullptr, " "); // Discard value string
 
-    if      (strcmp(token, Hash   ) == 0) config->hashSize = strtoull(strtok(nullptr, " "), nullptr, 10);
+    if      (strcmp(token, Hash   ) == 0) createTranspositionTable(&config->tt, config->hashSize = strtoull(strtok(nullptr, " "), nullptr, 10));
     else if (strcmp(token, Threads) == 0) config->threads = strtoul(strtok(nullptr, " "), nullptr, 10) - 1;
 }
 
 static void uci() {
     puts("id name GoldenRareBOT V3");
     puts("id author Deshawn Mohan");
-    puts("option name Hash type spin default 256 min 128 max 1024"); // TODO
-    puts("option name Threads type spin default 2 min 2 max 255");
+    puts("option name Hash type spin default 16 min 1 max 1024"); // TODO: What to make max?
+    puts("option name Threads type spin default 1 min 1 max 255");
     puts("uciok");
 }
 
@@ -193,7 +193,7 @@ static void train(const UCI_Configuration *restrict config) {
 
 void uciLoop() {
     // Default configuration
-    UCI_Configuration config = {.hashSize = 256, .threads = 1};
+    UCI_Configuration config = {.hashSize = 16, .threads = 1};
     ChessBoardHistory history = {0};
     parseFEN(&config.board, &history, START_POS);
     createTranspositionTable(&config.tt, config.hashSize);
