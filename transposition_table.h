@@ -11,6 +11,7 @@ constexpr int BUCKET_SIZE = 3; // TODO: Find optimal size
 typedef struct PositionEvaluation {
     uint16_t key;
     int16_t nodeScore;
+    int16_t staticEvaluation;
     Move bestMove;
     Depth depth;
     uint8_t ageBounds;
@@ -43,6 +44,10 @@ static inline void clearTranspositionTable(TT *restrict tt) {
     tt->age = -1;
 }
 
+static inline void destroyTranspositionTable(TT *restrict tt) {
+    free(tt->buckets);
+}
+
 static inline Bound getBound(const PositionEvaluation *pe) {
     return pe->ageBounds & 0x3;
 }
@@ -60,7 +65,7 @@ static inline Score adjustNodeScoreFromTT(Score nodeScore, int ply) {
 }
 
 // TODO: Need to ensure that function is called correctly due to type conversions
-static inline void savePositionEvaluation(TT *tt, PositionEvaluation *pe, Key positionKey, Move bestMove, Depth depth, Bound bound, int16_t nodeScore) {
+static inline void savePositionEvaluation(TT *tt, PositionEvaluation *pe, Key positionKey, Move bestMove, Depth depth, Bound bound, int16_t nodeScore, int16_t staticEvaluation) {
     uint16_t positionKeyIndex = positionKey >> 48;
     // TODO: How much to value an exact bound? Or even potentially other bounds?
     // Protect more valuable data from being overwritten
@@ -70,10 +75,29 @@ static inline void savePositionEvaluation(TT *tt, PositionEvaluation *pe, Key po
         pe->ageBounds = bound;
         pe->nodeScore = nodeScore;
     }
+    pe->staticEvaluation = staticEvaluation;
     pe->ageBounds = tt->age << 2 | getBound(pe);
     pe->key = positionKeyIndex;
 }
 
-PositionEvaluation* probeTranspositionTable(const TT *tt, Key positionKey, bool *restrict hasEvaluation);
+// TODO: Consider thread safety
+static inline PositionEvaluation* probeTranspositionTable(const TT *tt, Key positionKey, bool *restrict hasEvaluation) {
+    PositionEvaluation* pe = &tt->buckets[positionKey & tt->mask].pe[0];
+    uint16_t keyIndex = positionKey >> 48;
+
+    for (int i = 0; i < BUCKET_SIZE; i++) {
+        if (pe[i].key == keyIndex || !pe[i].key) {
+            *hasEvaluation = pe[i].key;
+            return &pe[i];
+        }
+    }
+
+    // Depth preferred replacement
+    PositionEvaluation *replace = pe;
+    for (int i = 1; i < BUCKET_SIZE; i++)
+        if (replace->depth > pe[i].depth) replace = &pe[i];
+    *hasEvaluation = false;
+    return replace;
+}
 
 #endif
