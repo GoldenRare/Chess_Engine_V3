@@ -1,14 +1,12 @@
-#include "move_generator.h"
+#include "attacks.h"
 #include "chess_board.h"
-#include "uci.h"
 #include "nnue.h"
-#include "transposition_table.h"
+#include "uci.h"
 
 int main () {
-    initializeMoveGenerator();
+    initializeAttacks();
     initializeChessBoard();
     initializeNNUE();
-    initializeTranspositionTable();
     uciLoop();
     return 0;
 }
