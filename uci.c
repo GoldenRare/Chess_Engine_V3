@@ -40,9 +40,9 @@ static void go(UCI_Configuration *restrict config) {
     constexpr char winc [] = "winc" ;
     constexpr char wtime[] = "wtime";
     // TODO: Options to potentially implement. All times are in msec
-    constexpr char nodes   [] = "nodes"   ;
-    constexpr char movetime[] = "movetime";
-    constexpr char infinite[] = "infinite";
+    //constexpr char nodes   [] = "nodes"   ;
+    //constexpr char movetime[] = "movetime";
+    //constexpr char infinite[] = "infinite";
 
     uint64_t bIncNs, bTimeNs, wIncNs, wTimeNs, stmSearchTimeNs, searchTimeNs;
     bIncNs = bTimeNs = wIncNs = wTimeNs = stmSearchTimeNs = searchTimeNs = 0;
@@ -53,10 +53,6 @@ static void go(UCI_Configuration *restrict config) {
         else if (strcmp(token, depth   ) == 0) strtok(nullptr, " ");
         else if (strcmp(token, winc    ) == 0) wIncNs = strtoull(strtok(nullptr, " "), nullptr, 10) * 1000000;
         else if (strcmp(token, wtime   ) == 0) wTimeNs = strtoull(strtok(nullptr, " "), nullptr, 10) * 1000000;
-        else if (strcmp(token, nodes   ) == 0);
-        else if (strcmp(token, movetime) == 0);
-        else if (strcmp(token, infinite) == 0)
-        ;
 
     stmSearchTimeNs = config->board.sideToMove ? bTimeNs / 20 + bIncNs / 2 : wTimeNs / 20 + wIncNs / 2;
     searchTimeNs = stmSearchTimeNs ? stmSearchTimeNs : 1000000000;
@@ -85,9 +81,7 @@ static void processMoves(ChessBoard *restrict board) {
     }
 }
 
-//position startpos moves e2e4 e7e5 g1f3 b8c6 f1b5 a7a6 b5a4 g8f6 e1g1 f8e7 d2d3 b7b5 a4b3 d7d6 c2c3 e8g8 b1d2 c8g4 h2h3 g4h5 a2a4 b5b4 c3c4 f6d7 b3c2 f7f5
-//position fen 7k/5P2/8/8/8/8/8/7K w - - 0 1 moves f7f8q h8h7 f8b4 h7g7 h1g2 g7f6 b4d2
-//position fen 4q2k/5P2/8/8/8/8/8/7K w - - 0 1 moves f7e8q h8g7
+// TODO: Fix setting FEN because of halfmove clock
 static void position(ChessBoard *restrict board) {
     constexpr char fen[] = "fen";
 
@@ -120,11 +114,11 @@ static void setOption(UCI_Configuration *restrict config) {
     strtok(nullptr, " "); // Discard value string
 
     if      (strcmp(token, Hash   ) == 0) createTranspositionTable(&config->tt, config->hashSize = strtoull(strtok(nullptr, " "), nullptr, 10));
-    else if (strcmp(token, Threads) == 0) config->threads = strtoul(strtok(nullptr, " "), nullptr, 10) - 1;
+    else if (strcmp(token, Threads) == 0) config->threads = strtoul(strtok(nullptr, " "), nullptr, 10);
 }
 
 static void uci() {
-    puts("id name GoldenRareBOT V3");
+    puts("id name Revolver 1.0");
     puts("id author Deshawn Mohan");
     puts("option name Hash type spin default 16 min 1 max 1024"); // TODO: What to make max?
     puts("option name Threads type spin default 1 min 1 max 255");
