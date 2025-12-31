@@ -28,8 +28,8 @@ typedef struct TranspositionTable {
 } TT;
 
 // Can be called multiple times but the first call must have tt->buckets == nullptr for the forced call to free()
-static inline void createTranspositionTable(TT *restrict tt, size_t MB) {
-    size_t numberOfBuckets = MB * 1024 * 1024 / sizeof(PEBucket); // Convert MB to B
+static inline void createTranspositionTable(TT *restrict tt, size_t mb) {
+    size_t numberOfBuckets = mb * 1024 * 1024 / sizeof(PEBucket); // Convert megabytes to bytes first
     
     // Rounds down to the nearest largest power of 2, this may cause substantially less space allocation than what was requested
     numberOfBuckets = squareToBitboard(bitboardToSquareMSB(numberOfBuckets));
@@ -39,13 +39,13 @@ static inline void createTranspositionTable(TT *restrict tt, size_t MB) {
     tt->age = -1;
 }
 
+static inline void destroyTranspositionTable(TT *restrict tt) {
+    free(tt->buckets);
+}
+
 static inline void clearTranspositionTable(TT *restrict tt) {
     memset(tt->buckets, 0, sizeof(PEBucket) * (tt->mask + 1));
     tt->age = -1;
-}
-
-static inline void destroyTranspositionTable(TT *restrict tt) {
-    free(tt->buckets);
 }
 
 static inline Bound getBound(const PositionEvaluation *pe) {
