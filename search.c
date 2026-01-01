@@ -52,9 +52,15 @@ static inline Score getRFPMargin(Depth depth) {
     return 150 * depth;
 }
 
-// TODO: Should eventually include seldepth, score mate, nps, maybe others
+// TODO: Should eventually include seldepth
 static inline void printSearch(Depth depth, Score score, const char *restrict pvString, const SearchThread *st) {
-    printf("info depth %d time %llu nodes %llu score cp %d pv %s\n", depth, (getTimeNs() - st->startNs) / 1000000, st->nodes, score, pvString);
+    uint64_t time = (getTimeNs() - st->startNs) / 1000000;
+    uint64_t nps = st->nodes * 1000 / (time + 1);
+    char *scoreType = score >= GUARANTEE_CHECKMATE || score <= -GUARANTEE_CHECKMATE ? "mate" : "cp";
+    score = score >=  GUARANTEE_CHECKMATE ? ( CHECKMATE - score + 1) / 2
+          : score <= -GUARANTEE_CHECKMATE ? (-CHECKMATE - score    ) / 2
+          : score;
+    printf("info depth %d score %s %d nodes %llu nps %llu time %llu pv %s\n", depth, scoreType, score, st->nodes, nps, time, pvString);
 }
 
 static Score quiescenceSearch(Score alpha, Score beta, SearchHelper *restrict sh, SearchThread *st) {
@@ -217,12 +223,14 @@ void* startSearch(void *searchThread) {
     st->nodes = 0;
     st->startNs = getTimeNs();
     for (Depth depth = 1; depth && !outOfTime(st); depth++) {
-        score = alphaBeta(alpha, beta, depth,  ROOT, sh, st);
+        score = alphaBeta(alpha, beta, depth, ROOT, sh, st);
         if (score > alpha && score < beta && !st->stop) {
             alpha = score - ASPIRATION_WINDOW;
             beta = score + ASPIRATION_WINDOW;
+            
             st->bestMove.move  = sh[0].pv[0];
             st->bestMove.score = score;
+
             pvToString(pvString, bestMove, ponderMove, sh[0].pv);
             if (st->print) printSearch(depth, score, pvString, st);
         } else {
