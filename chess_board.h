@@ -95,9 +95,7 @@ static inline void undoNullMove(ChessBoard *restrict board) {
 
 void initializeChessBoard();
 
-// Caller is responsible for ensuring the board and history struct are zeroed and
-// that the history pointer lasts for the necessary duration.
-void parseFEN(ChessBoard *board, ChessBoardHistory *history, const char *restrict fen);
+void parseFEN(ChessBoard *restrict board, ChessBoardHistory *restrict history, const char *restrict fen);
 void getFEN(const ChessBoard *restrict board, char *restrict destination);
 
 void makeNullMove(ChessBoard *board, ChessBoardHistory *newState);

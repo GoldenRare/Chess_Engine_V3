@@ -25,13 +25,7 @@ constexpr char BENCHMARK[] = "benchmark";
 constexpr char FEN      [] = "fen"      ;
 constexpr char TRAIN    [] = "train"    ;
 
-static ChessBoardHistory temp[256]; // TODO
-
-// Clears the board, but DOES NOT recursively clear the ChessBoardHistory, only clears the first one.
-static inline void clearBoard(ChessBoard *restrict board) {
-    *board->history = (ChessBoardHistory) {0};
-    *board          = (ChessBoard       ) {0};
-}
+static ChessBoardHistory histories[1024]; // TODO: New design? Can use position halfmove clock to determine max size
 
 static void go(UCI_Configuration *restrict config) {
     constexpr char binc [] = "binc" ;
@@ -65,16 +59,17 @@ static void isReady() {
 
 static void processMoves(ChessBoard *restrict board) {
     char *moveStr;
-    int i = 0;
+    int i = 1;
     while ((moveStr = strtok(nullptr, " "))) {
         MoveObject moveList[MAX_MOVES];
+        // TODO: Make a legal move generation stage
         MoveObject *endList = createMoveList(board, moveList, CAPTURES);
         endList = createMoveList(board, endList, NON_CAPTURES);
         char moveToName[6];
         for (MoveObject *startList = moveList; startList < endList; startList++) {
             moveToString(moveToName, startList->move);
             if (strcmp(moveStr, moveToName) == 0) {
-                makeMove(board, &temp[i++], startList->move);
+                makeMove(board, &histories[i++], startList->move);
                 break;
             }
         }
@@ -85,23 +80,14 @@ static void processMoves(ChessBoard *restrict board) {
 static void position(ChessBoard *restrict board) {
     constexpr char fen[] = "fen";
 
-    char *token = strtok(nullptr, " ");
-    char *fenStart = nullptr;
-    if (strcmp(token, fen) == 0) {
-        fenStart = token = token + 4;
-        while (*++token) 
-            if (*token == 'm') {
-                *(token - 1) = '\0';
-                break;
-            }
+    const char *fenStr = START_POS;
+    if (strcmp(strtok(nullptr, " "), fen) == 0) {
+        fenStr = strtok(nullptr, " ");
+        for (int i = 0; i < 5; i++) *(strtok(nullptr, " ") - 1) = ' ';
     }
-    ChessBoardHistory *history = board->history;
-    clearBoard(board);
-    parseFEN(board, history, fenStart ? fenStart : START_POS);
-    if ((*token == 'm') || *(token = token + 9) == 'm') {
-        strtok(token, " ");
-        processMoves(board);
-    }
+
+    parseFEN(board, &histories[0], fenStr);
+    if (strtok(nullptr, " ")) processMoves(board); // Assumes token is "moves" if there
 }
 
 static void setOption(UCI_Configuration *restrict config) {
@@ -188,8 +174,7 @@ static void train(const UCI_Configuration *restrict config) {
 void uciLoop() {
     // Default configuration
     UCI_Configuration config = {.hashSize = 16, .threads = 1};
-    ChessBoardHistory history = {0};
-    parseFEN(&config.board, &history, START_POS);
+    parseFEN(&config.board, &histories[0], START_POS);
     createTranspositionTable(&config.tt, config.hashSize);
 
     char input[4096]; // Assumes input is large enough to hold '\n' from stdin
@@ -197,7 +182,7 @@ void uciLoop() {
     setvbuf(stdout, nullptr, _IONBF, 0);
     while (!token || strcmp(token, QUIT) != 0) {
         fgets(input, sizeof(input), stdin);
-        input[strlen(input) - 1] = '\0';
+        input[strlen(input) - 1] = '\0'; // TODO: Can remove the length check
         token = strtok(input, " ");
         if (!token) continue;
 

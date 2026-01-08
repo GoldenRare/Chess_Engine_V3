@@ -146,7 +146,7 @@ void initializeChessBoard() {
     }
 }
 
-void parseFEN(ChessBoard *board, ChessBoardHistory *history, const char *restrict fen) {
+void parseFEN(ChessBoard *restrict board, ChessBoardHistory *restrict history, const char *restrict fen) {
     static const Colour CHAR_TO_COLOUR[128] = {
         ['P'] = WHITE, ['p'] = BLACK, 
         ['N'] = WHITE, ['n'] = BLACK, 
@@ -169,6 +169,9 @@ void parseFEN(ChessBoard *board, ChessBoardHistory *history, const char *restric
         ['K'] = WHITE_KINGSIDE , ['k'] = BLACK_KINGSIDE,
         ['-'] = 0
     };
+
+    *history = (ChessBoardHistory) {0};
+    *board   = (ChessBoard       ) {0};
 
     accumulatorReset(&board->accumulator); // TODO: Could this be done somewhere else?
     board->history = history;
