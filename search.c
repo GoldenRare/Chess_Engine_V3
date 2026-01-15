@@ -16,8 +16,9 @@ typedef enum Node {
 
 typedef struct SearchHelper {
     Move pv[MAX_DEPTH]; // TODO: Is it worth saving space by making triangular?
-    uint8_t ply;
 } SearchHelper;
+
+static Accumulator accumulator[(MAX_DEPTH + 1) * 2]; // TODO: Where to store accumulator and sizing
 
 static inline void updatePV(Move move, Move *restrict currentPV, const Move *restrict childrenPV) {
     *currentPV++ = move;
@@ -71,16 +72,17 @@ static Score quiescenceSearch(Score alpha, Score beta, SearchHelper *restrict sh
     if (isDraw(board)) return DRAW;
     /*                   */
     
-    Bitboard checkers = getCheckers(board);
+    bool checkers = getCheckers(board);
+    const Accumulator *currentAccumulator = &accumulator[st->ply    ];
+    Accumulator       *childAccumulator   = &accumulator[st->ply + 1];
     /* Stand Pat */
-    Score bestScore = checkers ? -CHECKMATE + sh->ply : evaluation(&board->accumulator, board->sideToMove); // TODO: Could be evaluating a stalemate
+    Score bestScore = checkers ? -CHECKMATE + st->ply : evaluation(currentAccumulator, board->sideToMove); // TODO: Could be evaluating a stalemate
     if (bestScore > alpha) {
         if (bestScore >= beta) return bestScore; 
         alpha = bestScore;
     }
     /*           */
 
-    uint8_t ply = sh->ply;
     /* Main Moves Loop */
     ChessBoardHistory history;
     MoveSelector ms;
@@ -90,11 +92,13 @@ static Score quiescenceSearch(Score alpha, Score beta, SearchHelper *restrict sh
     Move move;
     while ((move = getNextBestMove(board, &ms))) {
         if (!isLegalMove(board, move)) continue;
-        sh->ply = ply + 1;
-        makeMove(board, &history, move);
+        
+        st->ply++;
+        *childAccumulator = *currentAccumulator;
+        makeMove(board, &history, childAccumulator, move);
         Score score = -quiescenceSearch(-beta, -alpha, sh, st);
         undoMove(board, move);
-        sh->ply = ply;
+        st->ply--;
         
         if (score > bestScore) {
             if (score > alpha) {
@@ -130,7 +134,7 @@ static Score alphaBeta(Score alpha, Score beta, Depth depth, Node node, SearchHe
     if (hasEvaluation) {
         if (!isPvNode && pe->depth >= depth) {
             Bound bound = getBound(pe);
-            Score nodeScore = adjustNodeScoreFromTT(pe->nodeScore, sh->ply);
+            Score nodeScore = adjustNodeScoreFromTT(pe->nodeScore, st->ply);
             if (bound == EXACT || (bound == LOWER ? nodeScore >= beta : nodeScore <= alpha)) return nodeScore;
         }
         ttMove = pe->bestMove;
@@ -139,17 +143,21 @@ static Score alphaBeta(Score alpha, Score beta, Depth depth, Node node, SearchHe
 
     ChessBoardHistory history;
     SearchHelper *child = sh + 1;
-    child->ply = sh->ply + 1;
+    const Accumulator *currentAccumulator = &accumulator[st->ply    ];
+    Accumulator       *childAccumulator   = &accumulator[st->ply + 1];
 
     bool checkers = getCheckers(board);
     Score staticEvaluation = checkers ? -INFINITE 
                            : hasEvaluation ? pe->staticEvaluation
-                           : evaluation(&board->accumulator, board->sideToMove);
+                           : evaluation(currentAccumulator, board->sideToMove);
     /** 4) Null Move Pruning **/
     if (!isPvNode && !checkers && depth > 3 && staticEvaluation >= beta && hasNonPawnMaterial(board, board->sideToMove)) {
+        st->ply++;
+        *childAccumulator = *currentAccumulator;
         makeNullMove(board, &history);
         Score score = -alphaBeta(-beta, -beta + 1, depth - 4, NON_PV, child, st);
         undoNullMove(board);
+        st->ply--;
         if (score >= beta) return score;
     }
     /**                      **/
@@ -179,7 +187,9 @@ static Score alphaBeta(Score alpha, Score beta, Depth depth, Node node, SearchHe
         int reductions = legalMoves > 1 && depth > 1 ? 2 : 1;
         /**                         **/
 
-        makeMove(board, &history, move);
+        st->ply++;
+        *childAccumulator = *currentAccumulator;
+        makeMove(board, &history, childAccumulator, move);
 
         /* 9) Principal Variation Search */
         Score score;
@@ -188,11 +198,12 @@ static Score alphaBeta(Score alpha, Score beta, Depth depth, Node node, SearchHe
         /*                               */
         
         undoMove(board, move);
+        st->ply--;
 
         if (score > bestScore) {
             if (score > alpha) {
                 if (score >= beta) {
-                    if (!st->stop) savePositionEvaluation(st->tt, pe, positionKey, move, depth, LOWER, adjustNodeScoreToTT(score, sh->ply), staticEvaluation);
+                    if (!st->stop) savePositionEvaluation(st->tt, pe, positionKey, move, depth, LOWER, adjustNodeScoreToTT(score, st->ply), staticEvaluation);
                     return score;
                 }
                 updatePV(move, sh->pv, child->pv); // TODO: Only needs to be done once on the last score > alpha, but integrity is lost
@@ -205,10 +216,10 @@ static Score alphaBeta(Score alpha, Score beta, Depth depth, Node node, SearchHe
     /*                  */
 
     /* 10) Checkmate and Stalemate Detection */
-    if (!legalMoves) bestScore = checkers ? -CHECKMATE + sh->ply : DRAW; // TODO: Should this be considered EXACT bound?
+    if (!legalMoves) bestScore = checkers ? -CHECKMATE + st->ply : DRAW; // TODO: Should this be considered EXACT bound?
     /*                                       */
 
-    if (!st->stop) savePositionEvaluation(st->tt, pe, positionKey, bestMove, depth, bestScore > oldAlpha ? EXACT : UPPER, adjustNodeScoreToTT(bestScore == -INFINITE ? staticEvaluation : bestScore, sh->ply), staticEvaluation);
+    if (!st->stop) savePositionEvaluation(st->tt, pe, positionKey, bestMove, depth, bestScore > oldAlpha ? EXACT : UPPER, adjustNodeScoreToTT(bestScore == -INFINITE ? staticEvaluation : bestScore, st->ply), staticEvaluation);
     return bestScore;
 }
 
@@ -216,7 +227,6 @@ void* startSearch(void *searchThread) {
     constexpr Score ASPIRATION_WINDOW = 25;
     SearchThread *st = searchThread;
     SearchHelper sh[MAX_DEPTH + 1];
-    sh[0].ply = 0;
     
     char pvString[2048], bestMove[6], ponderMove[6];
     Score score, alpha = -INFINITE, beta = INFINITE;
@@ -252,6 +262,7 @@ void startSearchThreads(UCI_Configuration *restrict config, uint64_t searchTimeN
     pthread_t th;
     SearchThread st;
     createSearchThread(&st, &config->board, &config->tt, searchTimeNs, true);
+    accumulator[0] = config->accumulator;
     pthread_create(&th, nullptr, startSearch, &st);
     pthread_join(th, nullptr);
 }

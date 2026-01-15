@@ -30,6 +30,28 @@ constexpr CastlingRights CASTLING_RIGHTS_MASK[SQUARES] = {
     [A8] = BLACK_KINGSIDE | WHITE_RIGHTS, [B8] = ALL_RIGHTS, [C8] = ALL_RIGHTS, [D8] = ALL_RIGHTS, [E8] = WHITE_RIGHTS, [F8] = ALL_RIGHTS, [G8] = ALL_RIGHTS, [H8] = BLACK_QUEENSIDE | WHITE_RIGHTS,
 };
 
+static inline void addPiece(ChessBoard *restrict board, Colour c, PieceType pt, Square sq) {
+    Bitboard sqBB = squareToBitboard(sq);
+    board->pieceTypes[sq] = pt;
+    board->pieces[c][pt] |= sqBB;
+    board->pieces[c][ALL_PIECES] |= sqBB;
+}
+
+static inline void movePiece(ChessBoard *restrict board, Colour c, PieceType pt, Square fromSquare, Square toSquare) {
+    Bitboard fromToBB = squareToBitboard(fromSquare) | squareToBitboard(toSquare);
+    board->pieceTypes[toSquare] = pt;
+    board->pieceTypes[fromSquare] = NO_PIECE;
+    board->pieces[c][pt] ^= fromToBB;
+    board->pieces[c][ALL_PIECES] ^= fromToBB;
+}
+
+static inline void removePiece(ChessBoard *restrict board, Colour c, PieceType pt, Square sq) {
+    Bitboard sqBB = squareToBitboard(sq);
+    board->pieceTypes[sq] = NO_PIECE;
+    board->pieces[c][pt] ^= sqBB;
+    board->pieces[c][ALL_PIECES] ^= sqBB;
+}
+
 static void initializeZobrist() {
     uint64_t seed = 1070372;
     for (PieceType pt = PAWN; pt < PIECE_TYPES; pt++) {
@@ -48,34 +70,6 @@ static void initializeZobrist() {
     }
 
     zobristHashes.sideToMove = random64BitNumber(&seed);
-}
-
-// TODO: Make inline after accumulator optimizations are done
-static void addPiece(ChessBoard *restrict board, Colour c, PieceType pt, Square sq) {
-    Bitboard sqBB = squareToBitboard(sq);
-    board->pieceTypes[sq] = pt;
-    board->pieces[c][pt] |= sqBB;
-    board->pieces[c][ALL_PIECES] |= sqBB;
-    accumulatorAdd(&board->accumulator, c, pt, sq);
-}
-
-// TODO: Make inline after accumulator optimizations are done
-static void movePiece(ChessBoard *restrict board, Colour c, PieceType pt, Square fromSquare, Square toSquare) {
-    Bitboard fromToBB = squareToBitboard(fromSquare) | squareToBitboard(toSquare);
-    board->pieceTypes[toSquare] = pt;
-    board->pieceTypes[fromSquare] = NO_PIECE;
-    board->pieces[c][pt] ^= fromToBB;
-    board->pieces[c][ALL_PIECES] ^= fromToBB;
-    accumulatorAddSub(&board->accumulator, c, pt, fromSquare, toSquare);
-}
-
-// TODO: Make inline after accumulator optimizations are done
-static void removePiece(ChessBoard *restrict board, Colour c, PieceType pt, Square sq) {
-    Bitboard sqBB = squareToBitboard(sq);
-    board->pieceTypes[sq] = NO_PIECE;
-    board->pieces[c][pt] ^= sqBB;
-    board->pieces[c][ALL_PIECES] ^= sqBB;
-    accumulatorSub(&board->accumulator, c, pt, sq);
 }
 
 static bool fiftyMoveRule(const ChessBoard *restrict board) {
@@ -146,7 +140,7 @@ void initializeChessBoard() {
     }
 }
 
-void parseFEN(ChessBoard *restrict board, ChessBoardHistory *restrict history, const char *restrict fen) {
+void parseFEN(ChessBoard *restrict board, ChessBoardHistory *restrict history, Accumulator *restrict accumulator, const char *restrict fen) {
     static const Colour CHAR_TO_COLOUR[128] = {
         ['P'] = WHITE, ['p'] = BLACK, 
         ['N'] = WHITE, ['n'] = BLACK, 
@@ -173,7 +167,7 @@ void parseFEN(ChessBoard *restrict board, ChessBoardHistory *restrict history, c
     *history = (ChessBoardHistory) {0};
     *board   = (ChessBoard       ) {0};
 
-    accumulatorReset(&board->accumulator); // TODO: Could this be done somewhere else?
+    accumulatorReset(accumulator); // TODO: Could this be done somewhere else?
     board->history = history;
     /* 1) Piece Placement */
     Square sq = A8;
@@ -181,6 +175,7 @@ void parseFEN(ChessBoard *restrict board, ChessBoardHistory *restrict history, c
         unsigned char ch = *fen++;
         if (ch > 'A') {
             addPiece(board, CHAR_TO_COLOUR[ch], CHAR_TO_PIECE_TYPE[ch], sq);
+            accumulatorAdd(accumulator, CHAR_TO_COLOUR[ch], CHAR_TO_PIECE_TYPE[ch], sq);
             history->positionKey ^= zobristHashes.pieceOnSquare[CHAR_TO_PIECE_TYPE[ch] + COLOUR_OFFSET * CHAR_TO_COLOUR[ch]][sq++];
         } else if (ch > '/') {
             sq += ch - '0';
@@ -295,7 +290,7 @@ void getFEN(const ChessBoard *restrict board, char *restrict destination) {
     *destination = '\0';
 }
 
-void makeNullMove(ChessBoard *board, ChessBoardHistory *newState) {
+void makeNullMove(ChessBoard *restrict board, ChessBoardHistory *restrict newState) {
     newState->previous       = board->history;
     newState->positionKey    = getEnPassant(board) != NO_SQUARE ? getPositionKey(board) ^ zobristHashes.enPassant[squareToFile(getEnPassant(board))] : getPositionKey(board);
     newState->positionKey   ^= zobristHashes.sideToMove;
@@ -309,7 +304,7 @@ void makeNullMove(ChessBoard *board, ChessBoardHistory *newState) {
     newState->pinnedPieces = getPinnedPieces(board);
 }
 
-void makeMove(ChessBoard *board, ChessBoardHistory *newState, Move move) {
+void makeMove(ChessBoard *restrict board, ChessBoardHistory *restrict newState, Accumulator *restrict accumulator, Move move) {
     Square fromSquare = getFromSquare(move);
     Square   toSquare = getToSquare  (move);
     MoveType moveType = getMoveType  (move);
@@ -325,6 +320,7 @@ void makeMove(ChessBoard *board, ChessBoardHistory *newState, Move move) {
 
     if (newState->capturedPiece) {
         removePiece(board, enemy, newState->capturedPiece, captureSquare);
+        accumulatorSub(accumulator, enemy, newState->capturedPiece, captureSquare);
         newState->positionKey ^= zobristHashes.pieceOnSquare[newState->capturedPiece + COLOUR_OFFSET * enemy][captureSquare];
         newState->halfmoveClock = 0;
     } else if (moveType == CASTLE) {
@@ -332,6 +328,7 @@ void makeMove(ChessBoard *board, ChessBoardHistory *newState, Move move) {
         Square rookFromSquare = isKingSideCastle ? moveSquareInDirection(toSquare  , EAST) : moveSquareInDirection(toSquare  , WEST + WEST);
         Square rookToSquare   = isKingSideCastle ? moveSquareInDirection(fromSquare, EAST) : moveSquareInDirection(fromSquare, WEST       );
         movePiece(board, stm, ROOK, rookFromSquare, rookToSquare);
+        accumulatorAddSub(accumulator, stm, ROOK, rookFromSquare, rookToSquare);
         newState->positionKey ^= zobristHashes.pieceOnSquare[ROOK + colOffset][rookFromSquare] 
                               ^  zobristHashes.pieceOnSquare[ROOK + colOffset][rookToSquare  ];
     }
@@ -339,11 +336,14 @@ void makeMove(ChessBoard *board, ChessBoardHistory *newState, Move move) {
     if (moveType & PROMOTION) {
         PieceType pt = KNIGHT + (moveType & PROMOTION_PIECE_MASK);
         addPiece(board, stm, pt, toSquare);
+        accumulatorAdd(accumulator, stm, pt, toSquare);
         newState->positionKey ^= zobristHashes.pieceOnSquare[pt + colOffset][toSquare];
         removePiece(board, stm, PAWN, fromSquare);
+        accumulatorSub(accumulator, stm, PAWN, fromSquare);
         newState->positionKey ^= zobristHashes.pieceOnSquare[PAWN + colOffset][fromSquare];
     } else {
         movePiece(board, stm, fromPiece, fromSquare, toSquare);
+        accumulatorAddSub(accumulator, stm, fromPiece, fromSquare, toSquare);
         newState->positionKey ^= zobristHashes.pieceOnSquare[fromPiece + colOffset][fromSquare] 
                               ^  zobristHashes.pieceOnSquare[fromPiece + colOffset][toSquare  ];
     }

@@ -6,6 +6,7 @@
 #include "uci.h"
 #include "chess_board.h"
 #include "move_generator.h"
+#include "nnue.h"
 #include "transposition_table.h"
 #include "utility.h"
 #include "search.h"
@@ -57,7 +58,7 @@ static void isReady() {
     puts("readyok");
 }
 
-static void processMoves(ChessBoard *restrict board) {
+static void processMoves(ChessBoard *restrict board, Accumulator *restrict accumulator) {
     char *moveStr;
     int i = 1;
     while ((moveStr = strtok(nullptr, " "))) {
@@ -69,7 +70,7 @@ static void processMoves(ChessBoard *restrict board) {
         for (MoveObject *startList = moveList; startList < endList; startList++) {
             moveToString(moveToName, startList->move);
             if (strcmp(moveStr, moveToName) == 0) {
-                makeMove(board, &histories[i++], startList->move);
+                makeMove(board, &histories[i++], accumulator, startList->move);
                 break;
             }
         }
@@ -77,7 +78,7 @@ static void processMoves(ChessBoard *restrict board) {
 }
 
 // TODO: Fix setting FEN because of halfmove clock
-static void position(ChessBoard *restrict board) {
+static void position(ChessBoard *restrict board, Accumulator *restrict accumulator) {
     constexpr char fen[] = "fen";
 
     const char *fenStr = START_POS;
@@ -86,8 +87,8 @@ static void position(ChessBoard *restrict board) {
         for (int i = 0; i < 5; i++) *(strtok(nullptr, " ") - 1) = ' ';
     }
 
-    parseFEN(board, &histories[0], fenStr);
-    if (strtok(nullptr, " ")) processMoves(board); // Assumes token is "moves" if there
+    parseFEN(board, &histories[0], accumulator, fenStr);
+    if (strtok(nullptr, " ")) processMoves(board, accumulator); // Assumes token is "moves" if there
 }
 
 static void setOption(UCI_Configuration *restrict config) {
@@ -128,7 +129,7 @@ static uint64_t perft(ChessBoard *restrict board, Depth depth) {
         for (MoveObject *moveObj = moveList; moveObj != endList; moveObj++) {
             Move move = moveObj->move;
             if (!isLegalMove(board, move)) continue;
-            makeMove(board, &history, move);
+            makeMove(board, &history, nullptr, move);
             nodes += perft(board, depth - 1);
             undoMove(board, move);
         }
@@ -146,7 +147,7 @@ static void benchmark() {
     while (fgets(line, sizeof(line), perftFile)) {
         ChessBoard board = {0};
         ChessBoardHistory history = {0};
-        parseFEN(&board, &history, strtok(line, ","));
+        parseFEN(&board, &history, nullptr, strtok(line, ","));
 
         clock_t start = clock(); // TODO: Consider a more accurate clock
         actualNodes += perft(&board, depth);
@@ -174,7 +175,7 @@ static void train(const UCI_Configuration *restrict config) {
 void uciLoop() {
     // Default configuration
     UCI_Configuration config = {.hashSize = 16, .threads = 1};
-    parseFEN(&config.board, &histories[0], START_POS);
+    parseFEN(&config.board, &histories[0], &config.accumulator, START_POS);
     createTranspositionTable(&config.tt, config.hashSize);
 
     char input[4096]; // Assumes input is large enough to hold '\n' from stdin
@@ -189,7 +190,7 @@ void uciLoop() {
         // Official UCI Commands
         if      (strcmp(token, GO          ) == 0) go(&config);
         else if (strcmp(token, IS_READY    ) == 0) isReady();
-        else if (strcmp(token, POSITION    ) == 0) position(&config.board);
+        else if (strcmp(token, POSITION    ) == 0) position(&config.board, &config.accumulator);
         else if (strcmp(token, SET_OPTION  ) == 0) setOption(&config);
         else if (strcmp(token, UCI         ) == 0) uci();
         else if (strcmp(token, UCI_NEW_GAME) == 0) uciNewGame(&config.tt);

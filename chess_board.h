@@ -20,7 +20,6 @@ typedef struct ChessBoardHistory {
 } ChessBoardHistory;
 
 typedef struct ChessBoard {
-    Accumulator accumulator;
     ChessBoardHistory *history;
     Bitboard pieces[COLOURS][PIECE_TYPES];
     PieceType pieceTypes[SQUARES];
@@ -95,11 +94,11 @@ static inline void undoNullMove(ChessBoard *restrict board) {
 
 void initializeChessBoard();
 
-void parseFEN(ChessBoard *restrict board, ChessBoardHistory *restrict history, const char *restrict fen);
+void parseFEN(ChessBoard *restrict board, ChessBoardHistory *restrict history, Accumulator *restrict accumulator, const char *restrict fen);
 void getFEN(const ChessBoard *restrict board, char *restrict destination);
 
-void makeNullMove(ChessBoard *board, ChessBoardHistory *newState);
-void makeMove(ChessBoard *board, ChessBoardHistory *newState, Move move);
+void makeNullMove(ChessBoard *restrict board, ChessBoardHistory *restrict newState);
+void makeMove(ChessBoard *restrict board, ChessBoardHistory *restrict newState, Accumulator *restrict accumulator, Move move);
 void undoMove(ChessBoard *restrict board, Move move);
 bool isDraw(const ChessBoard *restrict board);
 bool isLegalMove(const ChessBoard *restrict board, Move move);

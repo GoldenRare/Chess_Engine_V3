@@ -80,7 +80,7 @@ static void playRandomMoves(ChessBoard *board, ChessBoardHistory *history, Train
             MoveObject *moveObj = &startList[random64BitNumber(&tt->seed) % moveListSize];
             Move move = moveObj->move;
             if (isLegalMove(board, move)) {
-                makeMove(board, &history[i], move);
+                makeMove(board, &history[i], nullptr, move);
                 break;
             }
             moveListSize--;
@@ -107,7 +107,7 @@ static void playGame(TrainingThread *tt, GameData *restrict previous) {
         writeGameData(previous, tt->file, outcome);
         return;
     }
-    makeMove(board, &history, bestMove->move);
+    makeMove(board, &history, nullptr, bestMove->move);
     playGame(tt, previous);
 }
 
@@ -116,9 +116,9 @@ static void playRandomGame(TrainingThread *tt) {
     ChessBoard board = {0};
     ChessBoardHistory history[MAX_RANDOM_MOVES + 1] = {0};
     GameData dummy = {.prev = nullptr};
-    parseFEN(&board, history, START_POS);
+    parseFEN(&board, history, nullptr, START_POS);
     playRandomMoves(&board, &history[1], tt);
-    createSearchThread(&tt->st, &board, tt->st.tt, 1000000000, false);
+    createSearchThread(&tt->st, &board, tt->st.tt, 1000000000 / 2, false);
     playGame(tt, &dummy); // TODO: Is it safe to write data for position that randomly is draw?
 }
 

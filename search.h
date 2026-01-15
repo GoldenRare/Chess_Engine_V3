@@ -15,6 +15,7 @@ typedef struct SearchThread {
     uint64_t maxSearchTimeNs;
     uint64_t nodes;
     MoveObject bestMove;
+    uint8_t ply;
     bool print;
     bool stop;
 } SearchThread;
@@ -29,6 +30,7 @@ static inline void createSearchThread(SearchThread *st, const ChessBoard *restri
     st->board = *board; // TODO: The history pointer is a shallow copy, consider using a deep copy
     st->tt = tt;
     st->maxSearchTimeNs = maxSearchTimeNs;
+    st->ply = 0;
     st->print = print;
     st->stop = false;
 }
