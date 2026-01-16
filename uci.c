@@ -23,6 +23,7 @@ constexpr char UCI_NEW_GAME[] = "ucinewgame";
 
 // Unofficial UCI Commands
 constexpr char BENCHMARK[] = "benchmark";
+constexpr char EVAL     [] = "eval"     ;
 constexpr char FEN      [] = "fen"      ;
 constexpr char TRAIN    [] = "train"    ;
 
@@ -162,6 +163,10 @@ static void benchmark() {
     fclose(perftFile);
 }
 
+static void eval(const Accumulator *restrict accumulator, Colour stm) {
+    printf("Static Evaluation: %d\n", evaluation(accumulator, stm));
+}
+
 static void fen(const ChessBoard *restrict board) {
     char fen[128];
     getFEN(board, fen);
@@ -197,6 +202,7 @@ void uciLoop() {
 
         // Unofficial UCI Commands
         else if (strcmp(token, BENCHMARK) == 0) benchmark();
+        else if (strcmp(token, EVAL     ) == 0) eval(&config.accumulator, config.board.sideToMove);
         else if (strcmp(token, FEN      ) == 0) fen(&config.board);
         else if (strcmp(token, TRAIN    ) == 0) train(&config);
     }
