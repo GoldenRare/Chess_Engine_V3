@@ -18,6 +18,7 @@ void accumulatorSub(Accumulator *restrict accumulator, Colour c, PieceType pt, S
 // Adds a piece to the accumulator, and removes it from the square it was previously on.
 // Always using the perspective of white.
 void accumulatorAddSub(Accumulator *restrict accumulator, Colour c, PieceType pt, Square fromSquare, Square toSquare);
+void accumulatorAddSubPromotion(Accumulator *restrict accumulator, Colour c, PieceType pt, Square fromSquare, Square toSquare);
 
 Score evaluation(const Accumulator *restrict accumulator, Colour stm);
 

@@ -335,12 +335,11 @@ void makeMove(ChessBoard *restrict board, ChessBoardHistory *restrict newState, 
 
     if (moveType & PROMOTION) {
         PieceType pt = KNIGHT + (moveType & PROMOTION_PIECE_MASK);
-        addPiece(board, stm, pt, toSquare);
-        accumulatorAdd(accumulator, stm, pt, toSquare);
-        newState->positionKey ^= zobristHashes.pieceOnSquare[pt + colOffset][toSquare];
+        newState->positionKey ^= zobristHashes.pieceOnSquare[PAWN + colOffset][fromSquare] 
+                              ^  zobristHashes.pieceOnSquare[pt   + colOffset][toSquare  ];
         removePiece(board, stm, PAWN, fromSquare);
-        accumulatorSub(accumulator, stm, PAWN, fromSquare);
-        newState->positionKey ^= zobristHashes.pieceOnSquare[PAWN + colOffset][fromSquare];
+        addPiece(board, stm, pt, toSquare);
+        accumulatorAddSubPromotion(accumulator, stm, pt, fromSquare, toSquare);
     } else {
         movePiece(board, stm, fromPiece, fromSquare, toSquare);
         accumulatorAddSub(accumulator, stm, fromPiece, fromSquare, toSquare);

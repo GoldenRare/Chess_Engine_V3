@@ -57,6 +57,15 @@ void accumulatorAddSub(Accumulator *restrict accumulator, Colour c, PieceType pt
         accumulator->accumulator[BLACK][i] += network->accumulatorWeights[c ^ 1][pt][toSquare][i] - network->accumulatorWeights[c ^ 1][pt][fromSquare][i];
 }
 
+void accumulatorAddSubPromotion(Accumulator *restrict accumulator, Colour c, PieceType pt, Square fromSquare, Square toSquare) {
+    pt--;
+    for (int i = 0; i < LAYER1; i++)
+        accumulator->accumulator[WHITE][i] += network->accumulatorWeights[c][pt][toSquare ^ FLIP_MASK][i] - network->accumulatorWeights[c][PAWN - 1][fromSquare ^ FLIP_MASK][i];
+
+    for (int i = 0; i < LAYER1; i++)
+        accumulator->accumulator[BLACK][i] += network->accumulatorWeights[c ^ 1][pt][toSquare][i] - network->accumulatorWeights[c ^ 1][PAWN - 1][fromSquare][i];
+}
+
 Score evaluation(const Accumulator *restrict accumulator, Colour stm) {
     Score score = 0;
     for (int i = 0; i < LAYER1; i++) score += SCReLU(accumulator->accumulator[stm    ][i]) * network->outputWeights[i         ];
